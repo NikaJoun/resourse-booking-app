@@ -3,7 +3,6 @@
     <div class="admin-card">
       <h1 class="admin-title">Админ-панель</h1>
       <div v-if="isAdmin">
-        <!-- Таб-меню -->
         <ul class="nav nav-tabs mb-4">
           <li class="nav-item">
             <a
@@ -25,8 +24,22 @@
           </li>
         </ul>
 
-        <!-- Контент для вкладки "Пользователи" -->
         <div v-if="activeTab === 'users'" class="tab-content">
+          <div class="mb-4">
+            <input
+              type="text"
+              class="form-control mb-2"
+              placeholder="Поиск по имени"
+              v-model="userSearchQuery"
+            />
+            <select class="form-select" v-model="userRoleFilter">
+              <option value="">Все роли</option>
+              <option value="user">Пользователь</option>
+              <option value="manager">Менеджер</option>
+              <option value="admin">Администратор</option>
+            </select>
+          </div>
+
           <button
             type="button"
             class="btn btn-success mb-4"
@@ -37,9 +50,8 @@
             Добавить пользователя
           </button>
 
-          <!-- Список пользователей -->
           <ul class="user-list">
-            <li v-for="user in users" :key="user.id" class="user-item">
+            <li v-for="user in filteredUsers" :key="user.id" class="user-item">
               <div class="user-info">
                 <strong>Имя:</strong> {{ user.username }} <br />
                 <strong>Роль:</strong> {{ user.role }} <br />
@@ -62,8 +74,28 @@
           </ul>
         </div>
 
-        <!-- Контент для вкладки "Ресурсы" -->
         <div v-if="activeTab === 'resources'" class="tab-content">
+          <div class="mb-4">
+            <input
+              type="text"
+              class="form-control mb-2"
+              placeholder="Поиск по названию"
+              v-model="resourceSearchQuery"
+            />
+            <select class="form-select mb-2" v-model="resourceTypeFilter">
+              <option value="">Все типы</option>
+              <option value="photographer">Фотограф</option>
+              <option value="conference_room">Конференц-зал</option>
+              <option value="equipment">Оборудование</option>
+            </select>
+            <select class="form-select" v-model="resourceManagerFilter">
+              <option value="">Все менеджеры</option>
+              <option v-for="manager in managers" :key="manager.id" :value="manager.id">
+                {{ manager.username }}
+              </option>
+            </select>
+          </div>
+
           <button
             type="button"
             class="btn btn-success mb-4"
@@ -74,9 +106,8 @@
             Добавить ресурс
           </button>
 
-          <!-- Список ресурсов -->
           <ul class="resource-list">
-            <li v-for="resource in resources" :key="resource.id" class="resource-item">
+            <li v-for="resource in filteredResources" :key="resource.id" class="resource-item">
               <div class="resource-info">
                 <strong>Название:</strong> {{ resource.name }} <br />
                 <strong>Тип:</strong> {{ resource.type }} <br />
@@ -99,128 +130,18 @@
           </ul>
         </div>
 
-        <!-- Модальное окно для пользователя -->
-        <div
-          class="modal fade"
-          id="userModal"
-          tabindex="-1"
-          aria-labelledby="userModalLabel"
-          aria-hidden="true"
-        >
-          <div class="modal-dialog">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title" id="userModalLabel">
-                  {{ isEditingUser ? 'Редактировать пользователя' : 'Добавить пользователя' }}
-                </h5>
-                <button
-                  type="button"
-                  class="btn-close"
-                  data-bs-dismiss="modal"
-                  aria-label="Close"
-                ></button>
-              </div>
-              <div class="modal-body">
-                <form @submit.prevent="saveUser">
-                  <div class="mb-3">
-                    <label for="username" class="form-label">Имя пользователя</label>
-                    <input type="text" class="form-control" id="username" v-model="currentUser.username" required />
-                  </div>
-                  <div class="mb-3">
-                    <label for="password" class="form-label">Пароль</label>
-                    <input type="password" class="form-control" id="password" v-model="currentUser.password" required />
-                  </div>
-                  <div class="mb-3">
-                    <label for="role" class="form-label">Роль</label>
-                    <select class="form-select" id="role" v-model="currentUser.role" required>
-                      <option value="user">Пользователь</option>
-                      <option value="manager">Менеджер</option>
-                      <option value="admin">Администратор</option>
-                    </select>
-                  </div>
-                  <div class="mb-3" v-if="currentUser.role === 'manager'">
-                    <label for="managedResourceType" class="form-label">Тип ресурса</label>
-                    <select class="form-select" id="managedResourceType" v-model="currentUser.managedResourceType">
-                      <option value="photographer">Фотограф</option>
-                      <option value="conference_room">Конференц-зал</option>
-                      <option value="equipment">Оборудование</option>
-                    </select>
-                  </div>
-                  <button type="submit" class="btn btn-primary me-2">
-                    {{ isEditingUser ? 'Сохранить изменения' : 'Добавить пользователя' }}
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-secondary"
-                    data-bs-dismiss="modal"
-                  >
-                    Отмена
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
+        <UserModal
+          :user="currentUser"
+          :is-editing="isEditingUser"
+          @save-user="saveUser"
+        />
 
-        <!-- Модальное окно для ресурса -->
-        <div
-          class="modal fade"
-          id="resourceModal"
-          tabindex="-1"
-          aria-labelledby="resourceModalLabel"
-          aria-hidden="true"
-        >
-          <div class="modal-dialog">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title" id="resourceModalLabel">
-                  {{ isEditingResource ? 'Редактировать ресурс' : 'Добавить ресурс' }}
-                </h5>
-                <button
-                  type="button"
-                  class="btn-close"
-                  data-bs-dismiss="modal"
-                  aria-label="Close"
-                ></button>
-              </div>
-              <div class="modal-body">
-                <form @submit.prevent="saveResource">
-                  <div class="mb-3">
-                    <label for="resourceName" class="form-label">Название ресурса</label>
-                    <input type="text" class="form-control" id="resourceName" v-model="currentResource.name" required />
-                  </div>
-                  <div class="mb-3">
-                    <label for="resourceType" class="form-label">Тип ресурса</label>
-                    <select class="form-select" id="resourceType" v-model="currentResource.type" required>
-                      <option value="photographer">Фотограф</option>
-                      <option value="conference_room">Конференц-зал</option>
-                      <option value="equipment">Оборудование</option>
-                    </select>
-                  </div>
-                  <div class="mb-3">
-                    <label for="managerId" class="form-label">Ответственный менеджер</label>
-                    <select class="form-select" id="managerId" v-model="currentResource.managerId">
-                      <option :value="null">Не назначено</option>
-                      <option v-for="manager in managers" :key="manager.id" :value="manager.id">
-                        {{ manager.username }}
-                      </option>
-                    </select>
-                  </div>
-                  <button type="submit" class="btn btn-primary me-2">
-                    {{ isEditingResource ? 'Сохранить изменения' : 'Добавить ресурс' }}
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-secondary"
-                    data-bs-dismiss="modal"
-                  >
-                    Отмена
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ResourceModal
+          :resource="currentResource"
+          :is-editing="isEditingResource"
+          :managers="managers"
+          @save-resource="saveResource"
+        />
       </div>
       <div v-else>
         <p>У вас нет доступа к этой странице.</p>
@@ -232,8 +153,14 @@
 <script>
 import { computed, ref } from 'vue';
 import { useStore } from 'vuex';
+import UserModal from '@/components/UserModal.vue';
+import ResourceModal from '@/components/ResourceModal.vue';
 
 export default {
+  components: {
+    UserModal,
+    ResourceModal,
+  },
   setup() {
     const store = useStore();
 
@@ -241,9 +168,7 @@ export default {
     const resources = computed(() => store.state.resources);
     const isAdmin = computed(() => store.getters.isAdmin);
 
-    const activeTab = ref('users'); // Активная вкладка по умолчанию
-    const isUserModalOpen = ref(false);
-    const isResourceModalOpen = ref(false);
+    const activeTab = ref('users');
     const isEditingUser = ref(false);
     const isEditingResource = ref(false);
 
@@ -262,6 +187,12 @@ export default {
       managerId: null,
     });
 
+    const userSearchQuery = ref('');
+    const userRoleFilter = ref('');
+    const resourceSearchQuery = ref('');
+    const resourceTypeFilter = ref('');
+    const resourceManagerFilter = ref('');
+
     const managers = computed(() =>
       store.state.users.filter((user) => user.role === 'manager')
     );
@@ -270,6 +201,23 @@ export default {
       const manager = store.state.users.find((user) => user.id === managerId);
       return manager ? manager.username : null;
     };
+
+    const filteredUsers = computed(() => {
+      return users.value.filter((user) => {
+        const matchesSearch = user.username.toLowerCase().includes(userSearchQuery.value.toLowerCase());
+        const matchesRole = userRoleFilter.value ? user.role === userRoleFilter.value : true;
+        return matchesSearch && matchesRole;
+      });
+    });
+
+    const filteredResources = computed(() => {
+      return resources.value.filter((resource) => {
+        const matchesSearch = resource.name.toLowerCase().includes(resourceSearchQuery.value.toLowerCase());
+        const matchesType = resourceTypeFilter.value ? resource.type === resourceTypeFilter.value : true;
+        const matchesManager = resourceManagerFilter.value ? resource.managerId === resourceManagerFilter.value : true;
+        return matchesSearch && matchesType && matchesManager;
+      });
+    });
 
     const openUserModal = (user) => {
       if (user) {
@@ -285,11 +233,6 @@ export default {
         };
         isEditingUser.value = false;
       }
-      isUserModalOpen.value = true;
-    };
-
-    const closeUserModal = () => {
-      isUserModalOpen.value = false;
     };
 
     const deleteUser = (userId) => {
@@ -298,13 +241,12 @@ export default {
       }
     };
 
-    const saveUser = () => {
+    const saveUser = (user) => {
       if (isEditingUser.value) {
-        store.commit('UPDATE_USER', currentUser.value);
+        store.commit('UPDATE_USER', user);
       } else {
-        store.commit('ADD_USER', currentUser.value);
+        store.commit('ADD_USER', user);
       }
-      closeUserModal();
     };
 
     const openResourceModal = (resource) => {
@@ -320,11 +262,6 @@ export default {
         };
         isEditingResource.value = false;
       }
-      isResourceModalOpen.value = true;
-    };
-
-    const closeResourceModal = () => {
-      isResourceModalOpen.value = false;
     };
 
     const deleteResource = (resourceId) => {
@@ -333,13 +270,12 @@ export default {
       }
     };
 
-    const saveResource = () => {
+    const saveResource = (resource) => {
       if (isEditingResource.value) {
-        store.commit('UPDATE_RESOURCE', currentResource.value);
+        store.commit('UPDATE_RESOURCE', resource);
       } else {
-        store.commit('ADD_RESOURCE', currentResource.value);
+        store.commit('ADD_RESOURCE', resource);
       }
-      closeResourceModal();
     };
 
     return {
@@ -347,8 +283,6 @@ export default {
       resources,
       isAdmin,
       activeTab,
-      isUserModalOpen,
-      isResourceModalOpen,
       isEditingUser,
       isEditingResource,
       currentUser,
@@ -356,13 +290,18 @@ export default {
       managers,
       getManagerName,
       openUserModal,
-      closeUserModal,
       deleteUser,
       saveUser,
       openResourceModal,
-      closeResourceModal,
       deleteResource,
       saveResource,
+      userSearchQuery,
+      userRoleFilter,
+      resourceSearchQuery,
+      resourceTypeFilter,
+      resourceManagerFilter,
+      filteredUsers,
+      filteredResources,
     };
   },
 };

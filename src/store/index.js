@@ -84,6 +84,13 @@ export default createStore({
         localStorage.setItem('bookings', JSON.stringify(state.bookings));
       }
     },
+    CANCEL_BOOKING(state, bookingId) {
+      const booking = state.bookings.find((booking) => booking.id === bookingId);
+      if (booking) {
+        booking.isCancelled = true;
+        localStorage.setItem('bookings', JSON.stringify(state.bookings));
+      }
+    },
   },
   actions: {
     login({ commit }, user) {
@@ -169,6 +176,10 @@ export default createStore({
           managedResourceIds.includes(booking.resourceId) &&
           !booking.isConfirmed 
       );
+    },
+    getUserNameById: (state) => (userId) => {
+      const user = state.users.find((user) => user.id === userId);
+      return user ? user.username : `Пользователь ${userId}`;
     },
   },
 });

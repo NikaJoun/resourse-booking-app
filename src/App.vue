@@ -1,14 +1,11 @@
 <template>
   <div id="app">
-    <!-- Навигация -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container-fluid">
-        <!-- Название приложения -->
         <router-link to="/" class="navbar-brand">
           <span class="app-name">РесурсБук</span>
         </router-link>
 
-        <!-- Кнопка для мобильного меню -->
         <button
           class="navbar-toggler"
           type="button"
@@ -21,7 +18,6 @@
           <span class="navbar-toggler-icon"></span>
         </button>
 
-        <!-- Основное меню -->
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto">
             <template v-if="isAuthenticated">
@@ -29,7 +25,13 @@
                 <router-link to="/profile" class="nav-link">Профиль</router-link>
               </li>
               <li class="nav-item">
+                <router-link to="/calendar" class="nav-link">Календарь</router-link>
+              </li>
+              <li class="nav-item">
                 <router-link to="/booking" class="nav-link">Бронирование</router-link>
+              </li>
+              <li v-if="isManager" class="nav-item">
+                <router-link to="/manager/resources" class="nav-link">Управление ресурсами</router-link>
               </li>
               <li v-if="isAdmin" class="nav-item">
                 <router-link to="/admin" class="nav-link">Админка</router-link>
@@ -43,12 +45,10 @@
       </div>
     </nav>
 
-    <!-- Основной контент -->
     <main class="main-content">
       <router-view />
     </main>
 
-    <!-- Футер -->
     <footer class="footer">
       <div class="container">
         <span class="footer-text">by NikaJoun</span>
@@ -67,13 +67,12 @@ export default {
     const store = useStore();
     const router = useRouter();
 
-    // Проверяем, авторизован ли пользователь
     const isAuthenticated = computed(() => store.state.currentUser !== null);
 
-    // Проверяем, является ли пользователь администратором
+    const isManager = computed(() => store.state.currentUser?.role === 'manager');
+
     const isAdmin = computed(() => store.state.currentUser?.role === 'admin');
 
-    // Выход из системы
     const logout = () => {
       store.dispatch('logout');
       router.push('/');
@@ -81,6 +80,7 @@ export default {
 
     return {
       isAuthenticated,
+      isManager,
       isAdmin,
       logout,
     };

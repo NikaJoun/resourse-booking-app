@@ -27,3 +27,9 @@ npm run serve
 ```
 
 После этого проект будет доступен по адресу: http://localhost:8080
+
+## Данные пользователей
+
+admin – логин: admin, пароль: admin123
+manager – логин: manager, пароль: manager123
+user – логин: user, пароль: user123

@@ -3,107 +3,34 @@
     <div class="profile-card">
       <h1 class="profile-title">Профиль</h1>
 
-      <!-- Имя пользователя -->
       <div v-if="store.state.currentUser" class="user-info">
         <h2>Добро пожаловать, {{ store.state.currentUser.username }}!</h2>
       </div>
 
-      <!-- Кнопка для открытия истории бронирований -->
-      <button
-        type="button"
-        class="btn btn-primary mb-4"
-        data-bs-toggle="modal"
-        data-bs-target="#bookingHistoryModal"
-      >
-        История бронирований
-      </button>
-
-      <!-- Модальное окно для истории бронирований -->
-      <div
-        class="modal fade"
-        id="bookingHistoryModal"
-        tabindex="-1"
-        aria-labelledby="bookingHistoryModalLabel"
-        aria-hidden="true"
-      >
-        <div class="modal-dialog modal-lg">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="bookingHistoryModalLabel">История бронирований</h5>
-              <button
-                type="button"
-                class="btn-close"
-                data-bs-dismiss="modal"
-                aria-label="Close"
-              ></button>
-            </div>
-            <div class="modal-body">
-              <ul class="booking-history-list">
-                <li
-                  v-for="booking in bookingHistory"
-                  :key="booking.id"
-                  class="booking-history-item"
-                >
-                  <div class="booking-info">
-                    <strong>Дата:</strong> {{ booking.date }} <br />
-                    <strong>Время:</strong> {{ booking.time }} <br />
-                    <strong>Ресурс:</strong> {{ getResourceName(booking.resourceId) }} <br />
-                    <strong>Продолжительность:</strong> {{ booking.duration }} час(ов) <br />
-                    <strong>Статус:</strong>
-                    <span :class="booking.isConfirmed ? 'text-success' : 'text-warning'">
-                      {{ booking.isConfirmed ? 'Подтверждено' : 'Ожидает подтверждения' }}
-                    </span>
-                  </div>
-                </li>
-              </ul>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                Закрыть
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Бронирования пользователя -->
-      <h2>Мои бронирования</h2>
-      <ul class="booking-list">
-        <li v-for="booking in userBookings" :key="booking.id" class="booking-item">
-          <div class="booking-info">
-            <strong>Дата:</strong> {{ booking.date }} <br />
-            <strong>Время:</strong> {{ booking.time }} <br />
-            <strong>Ресурс:</strong> {{ getResourceName(booking.resourceId) }} <br />
-            <strong>Продолжительность:</strong> {{ booking.duration }} час(ов) <br />
-            <strong>Статус:</strong>
-            <span :class="booking.isConfirmed ? 'text-success' : 'text-warning'">
-              {{ booking.isConfirmed ? 'Подтверждено' : 'Ожидает подтверждения' }}
-            </span>
-          </div>
-          <button @click="cancelBooking(booking.id)" class="btn btn-warning">Отменить</button>
+      <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+          <a
+            class="nav-link"
+            :class="{ active: activeTab === 'active' }"
+            @click="activeTab = 'active'"
+          >
+            Активные бронирования
+          </a>
+        </li>
+        <li class="nav-item">
+          <a
+            class="nav-link"
+            :class="{ active: activeTab === 'history' }"
+            @click="activeTab = 'history'"
+          >
+            История бронирований
+          </a>
         </li>
       </ul>
 
-      <!-- Управление ресурсами (для менеджеров) -->
-      <div v-if="store.getters.isResourceManager">
-        <h2>Управление ресурсами</h2>
-
-        <!-- Список ресурсов, за которые отвечает менеджер -->
-        <ul class="resource-list">
-          <li v-for="resource in managedResources" :key="resource.id" class="resource-item">
-            <div class="resource-info">
-              <strong>Название:</strong> {{ resource.name }} <br />
-              <strong>Тип:</strong> {{ resource.type }}
-            </div>
-            <button @click="editResource(resource)" class="btn btn-secondary">Редактировать</button>
-            <button @click="removeResource(resource.id)" class="btn btn-danger">Удалить</button>
-          </li>
-        </ul>
-
-        <!-- Подтверждение бронирований -->
-        <h2>Подтверждение бронирований</h2>
+      <div v-if="activeTab === 'active'" class="tab-content">
         <ul class="booking-list">
-          <li v-for="booking in pendingBookings" :key="booking.id" class="booking-item">
+          <li v-for="booking in activeBookings" :key="booking.id" class="booking-item">
             <div class="booking-info">
               <strong>Дата:</strong> {{ booking.date }} <br />
               <strong>Время:</strong> {{ booking.time }} <br />
@@ -114,127 +41,124 @@
                 {{ booking.isConfirmed ? 'Подтверждено' : 'Ожидает подтверждения' }}
               </span>
             </div>
-            <button @click="confirmBooking(booking.id)" class="btn btn-success">Подтвердить</button>
-            <button @click="rejectBooking(booking.id)" class="btn btn-danger">Отклонить</button>
+            <button @click="openCancelModal(booking.id)" class="btn btn-warning">Отменить</button>
           </li>
         </ul>
+        <div v-if="activeBookings.length === 0" class="no-bookings-message">
+          <p>Нет активных бронирований.</p>
+        </div>
+      </div>
+
+      <div v-if="activeTab === 'history'" class="tab-content">
+        <ul class="booking-list">
+          <li v-for="booking in bookingHistory" :key="booking.id" class="booking-item">
+            <div class="booking-info">
+              <strong>Дата:</strong> {{ booking.date }} <br />
+              <strong>Время:</strong> {{ booking.time }} <br />
+              <strong>Ресурс:</strong> {{ getResourceName(booking.resourceId) }} <br />
+              <strong>Продолжительность:</strong> {{ booking.duration }} час(ов) <br />
+              <strong>Статус:</strong>
+              <span :class="getStatusClass(booking)">
+                {{ getStatusText(booking) }}
+              </span>
+            </div>
+          </li>
+        </ul>
+        <div v-if="bookingHistory.length === 0" class="no-bookings-message">
+          <p>Нет завершенных бронирований.</p>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showCancelModal" class="modal-overlay">
+      <div class="modal-content">
+        <h3>Подтверждение отмены</h3>
+        <p>Вы уверены, что хотите отменить это бронирование?</p>
+        <div class="modal-actions">
+          <button @click="confirmCancel" class="btn btn-danger">Подтвердить</button>
+          <button @click="closeCancelModal" class="btn btn-secondary">Отмена</button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useStore } from 'vuex';
-import { useRouter } from 'vue-router';
 
 export default {
-  data() {
-    return {
-      showHistoryModal: false,
-    };
-  },
-  computed: {
-    bookingHistory() {
-      if (!this.$store.state.currentUser) return [];
-
-      if (this.$store.state.currentUser.role === 'user') {
-        // Для пользователя: все его бронирования
-        return this.$store.state.bookings.filter(
-          (booking) => booking.userId === this.$store.state.currentUser.id
-        );
-      } else if (this.$store.state.currentUser.role === 'manager') {
-        // Для менеджера: бронирования по его ответственному типу
-        const managedResourceIds = this.$store.getters.managedResources.map(
-          (resource) => resource.id
-        );
-        return this.$store.state.bookings.filter((booking) =>
-          managedResourceIds.includes(booking.resourceId)
-        );
-      }
-
-      return [];
-    },
-  },
   setup() {
     const store = useStore();
-    const router = useRouter();
 
-    // Бронирования текущего пользователя
-    const userBookings = computed(() => {
+    const activeTab = ref('active');
+    const showCancelModal = ref(false);
+    const selectedBookingId = ref(null);
+
+    const openCancelModal = (bookingId) => {
+      selectedBookingId.value = bookingId;
+      showCancelModal.value = true;
+    };
+
+    const closeCancelModal = () => {
+      showCancelModal.value = false;
+      selectedBookingId.value = null;
+    };
+
+    const confirmCancel = () => {
+      if (selectedBookingId.value) {
+        store.commit('CANCEL_BOOKING', selectedBookingId.value);
+      }
+      closeCancelModal();
+    };
+
+    const activeBookings = computed(() => {
       if (!store.state.currentUser) return [];
       return store.state.bookings.filter(
-        (booking) => booking.userId === store.state.currentUser.id
+        (booking) =>
+          booking.userId === store.state.currentUser.id &&
+          !booking.isCancelled &&
+          !booking.isCompleted
       );
     });
 
-    // Ресурсы, за которые отвечает текущий менеджер
-    const managedResources = computed(() => store.getters.managedResources);
-
-    // Бронирования, ожидающие подтверждения
-    const pendingBookings = computed(() => {
-      if (!store.state.currentUser || store.state.currentUser.role !== 'manager') return [];
-      const managedResourceIds = managedResources.value.map((resource) => resource.id);
+    const bookingHistory = computed(() => {
+      if (!store.state.currentUser) return [];
       return store.state.bookings.filter(
         (booking) =>
-          managedResourceIds.includes(booking.resourceId) && !booking.isConfirmed
+          booking.userId === store.state.currentUser.id &&
+          (booking.isCancelled || booking.isCompleted)
       );
     });
 
-    // Название ресурса по ID
     const getResourceName = (resourceId) => {
       return store.getters.getResourceNameById(resourceId);
     };
 
-    // Редактирование ресурса
-    const editResource = (resource) => {
-      const newName = prompt('Введите новое название:', resource.name);
-      if (newName) {
-        const updatedResource = { ...resource, name: newName };
-        store.dispatch('updateResource', updatedResource);
-      }
+    const getStatusClass = (booking) => {
+      if (booking.isCompleted) return 'text-success';
+      if (booking.isCancelled) return 'text-danger';
+      return 'text-warning';
     };
 
-    // Удаление ресурса
-    const removeResource = (resourceId) => {
-      if (confirm('Вы уверены, что хотите удалить этот ресурс?')) {
-        store.dispatch('removeResource', resourceId);
-      }
-    };
-
-    // Подтверждение бронирования
-    const confirmBooking = (bookingId) => {
-      store.commit('CONFIRM_BOOKING', bookingId);
-    };
-
-    // Отклонение бронирования
-    const rejectBooking = (bookingId) => {
-      store.commit('REMOVE_BOOKING', bookingId);
-    };
-
-    // Отмена бронирования
-    const cancelBooking = (bookingId) => {
-      store.commit('REMOVE_BOOKING', bookingId);
-    };
-
-    // Выход из системы
-    const logout = () => {
-      store.dispatch('logout');
-      router.push('/');
+    const getStatusText = (booking) => {
+      if (booking.isCompleted) return 'Завершено';
+      if (booking.isCancelled) return 'Отменено';
+      return 'Ожидает подтверждения';
     };
 
     return {
       store,
-      userBookings,
-      managedResources,
-      pendingBookings,
+      activeTab,
+      activeBookings,
+      bookingHistory,
       getResourceName,
-      editResource,
-      removeResource,
-      confirmBooking,
-      rejectBooking,
-      cancelBooking,
-      logout,
+      getStatusClass,
+      getStatusText,
+      showCancelModal,
+      openCancelModal,
+      closeCancelModal,
+      confirmCancel,
     };
   },
 };
@@ -277,14 +201,37 @@ export default {
   }
 }
 
-.booking-list,
-.resource-list {
+.nav-tabs {
+  border-bottom: 2px solid #dee2e6;
+
+  .nav-link {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px 8px 0 0;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #495057;
+    transition: all 0.3s ease;
+    cursor: pointer;
+
+    &:hover {
+      background-color: #f8f9fa;
+    }
+
+    &.active {
+      color: #007bff;
+      border-bottom: 2px solid #007bff;
+      background-color: transparent;
+    }
+  }
+}
+
+.booking-list {
   list-style: none;
   padding: 0;
 }
 
-.booking-item,
-.resource-item {
+.booking-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -295,8 +242,7 @@ export default {
   background-color: #f8f9fa;
 }
 
-.booking-info,
-.resource-info {
+.booking-info {
   flex: 1;
 
   strong {
@@ -317,24 +263,9 @@ export default {
   }
 }
 
-.btn-danger {
-  background-color: #dc3545;
-  color: white;
-}
-
 .btn-warning {
   background-color: #ffc107;
   color: black;
-}
-
-.btn-success {
-  background-color: #28a745;
-  color: white;
-}
-
-.btn-secondary {
-  background-color: #6c757d;
-  color: white;
 }
 
 .text-success {
@@ -345,16 +276,47 @@ export default {
   color: orange;
 }
 
-.booking-history-list {
-  list-style: none;
-  padding: 0;
+.text-danger {
+  color: red;
 }
 
-.booking-history-item {
-  padding: 1rem;
-  border: 1px solid #ced4da;
+.no-bookings-message {
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
+  font-size: 1.1rem;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
   border-radius: 8px;
-  margin-bottom: 1rem;
-  background-color: #f8f9fa;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+
+  h3 {
+    margin-bottom: 1rem;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
 }
 </style>
