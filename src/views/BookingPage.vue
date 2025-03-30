@@ -245,32 +245,49 @@ export default {
   font-weight: 500;
   color: #495057;
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
+  transition: all 0.3s ease;
 
   &:hover {
     background-color: #e9ecef;
-    transform: scale(1.02);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   }
 
   &.active {
     background-color: #007bff;
     color: white;
     border-color: #007bff;
+    box-shadow: 0 2px 5px rgba(0, 123, 255, 0.3);
   }
 }
 
 .btn-back,
-.btn-next {
+.btn-next,
+.btn-confirm {
   margin-top: 1rem;
   padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 8px;
-  background-color: #6c757d;
-  color: white;
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
+  display: inline-block;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.btn-back {
+  background-color: #6c757d;
+  color: white;
+  margin-right: 1rem;
 
   &:hover {
     background-color: #5a6268;
@@ -279,55 +296,101 @@ export default {
 
 .btn-next {
   background-color: #28a745;
-  margin-left: 1rem;
+  color: white;
 
   &:hover {
     background-color: #218838;
   }
 }
 
+.btn-confirm {
+  background-color: #007bff;
+  color: white;
+  margin-right: 1rem;
+
+  &:hover {
+    background-color: #0069d9;
+  }
+}
+
 .duration-select {
   margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
 
   label {
     font-size: 1rem;
     color: #495057;
     margin-right: 0.5rem;
+    font-weight: 500;
   }
 
   select {
-    padding: 0.5rem;
+    padding: 0.5rem 1rem;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     font-size: 1rem;
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+
+    &:focus {
+      outline: none;
+      border-color: #007bff;
+      box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
   }
 }
 
 .confirmation-details {
   margin-bottom: 1.5rem;
+  background-color: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
 
   p {
     font-size: 1rem;
     color: #495057;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+    line-height: 1.6;
+
+    strong {
+      font-weight: 600;
+      color: #343a40;
+    }
   }
 }
 
-.alert-danger {
-  background-color: #f8d7da;
-  color: #721c24;
-  padding: 0.75rem;
+.alert {
+  padding: 1rem;
   border-radius: 8px;
-  border: 1px solid #f5c6cb;
+  margin-top: 1.5rem;
   text-align: center;
+  font-weight: 500;
+
+  &-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
+
+  &-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
 }
 
-.alert-success {
-  background-color: #d4edda;
-  color: #155724;
-  padding: 0.75rem;
-  border-radius: 8px;
-  border: 1px solid #c3e6cb;
-  text-align: center;
+@media (max-width: 576px) {
+  .booking-card {
+    padding: 1.5rem;
+  }
+
+  .btn-back,
+  .btn-next,
+  .btn-confirm {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 0.5rem;
+  }
 }
 </style>

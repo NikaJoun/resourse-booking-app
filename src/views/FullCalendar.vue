@@ -1,54 +1,57 @@
 <template>
-    <div class="calendar-page">
-      <!-- Заголовок и фильтры -->
-      <div class="filters">
-        <h1>Календарь бронирований</h1>
-        <div class="filter-controls">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Поиск по ресурсу..."
-            class="search-input"
-          />
-          <select v-model="selectedResource" class="resource-select">
-            <option value="">Все ресурсы</option>
-            <option v-for="resource in resources" :key="resource.id" :value="resource.id">
-              {{ resource.name }}
-            </option>
-          </select>
-          <input
-            v-model="selectedDate"
-            type="date"
-            class="date-input"
-          />
+  <div class="calendar-page">
+    <div class="filters">
+      <h1>Календарь бронирований</h1>
+      <div class="filter-controls">
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Поиск по ресурсу..."
+          class="search-input"
+        />
+        <select v-model="selectedResource" class="resource-select">
+          <option value="">Все ресурсы</option>
+          <option v-for="resource in resources" :key="resource.id" :value="resource.id">
+            {{ resource.name }}
+          </option>
+        </select>
+        <div class="week-navigation">
+          <button @click="prevWeek" class="nav-button">&lt;</button>
+          <span class="week-range">{{ weekRange }}</span>
+          <button @click="nextWeek" class="nav-button">&gt;</button>
         </div>
       </div>
-  
-      <!-- Сообщение о необходимости фильтров -->
-      <div v-if="!showCalendar" class="alert alert-info">
-        Пожалуйста, воспользуйтесь поиском или фильтрами, чтобы отобразить календарь.
-      </div>
-  
-      <!-- Календарь -->
-      <div v-if="showCalendar" class="calendar">
+    </div>
+
+    <div class="calendar-container">
+      <div class="calendar">
         <table>
           <thead>
             <tr>
               <th>Время</th>
-              <th v-for="day in days" :key="day">{{ day }}</th>
+              <th v-for="day in days" :key="day.date">{{ day.name }}<br>{{ day.date }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="timeSlot in timeSlots" :key="timeSlot">
-              <td>{{ timeSlot }}</td>
+              <td class="time-slot">{{ timeSlot }}</td>
               <td
                 v-for="day in days"
-                :key="day"
-                :class="getCellClass(day, timeSlot)"
-                @click="handleCellClick(day, timeSlot)"
+                :key="day.date"
+                :class="getCellClass(day.date, timeSlot)"
+                @click="handleCellClick(day.date, timeSlot)"
               >
-                <div v-for="booking in getBookingsForCell(day, timeSlot)" :key="booking.id" class="booking">
-                 ({{ booking.userName || `Пользователь ${booking.userId}` }})
+                <div 
+                  v-for="booking in getBookingsForCell(day.date, timeSlot)" 
+                  :key="booking.id" 
+                  class="booking"
+                  :class="{
+                    confirmed: booking.isConfirmed,
+                    pending: !booking.isConfirmed
+                  }"
+                >
+                  <span class="user-name">{{ booking.userName || `Пользователь ${booking.userId}` }}</span>
+                  <span class="resource-name">{{ booking.resourceName }}</span>
                 </div>
               </td>
             </tr>
@@ -56,195 +59,329 @@
         </table>
       </div>
     </div>
-  </template>
-  
-  <script>
-    import { ref, computed, watch } from 'vue';
-    import { useStore } from 'vuex';
+  </div>
+</template>
 
-    export default {
-    setup() {
-        const store = useStore();
+<script>
+import { ref, computed } from 'vue';
+import { useStore } from 'vuex';
 
-        // Данные для фильтрации
-        const searchQuery = ref('');
-        const selectedResource = ref('');
-        const selectedDate = ref('');
+export default {
+  setup() {
+    const store = useStore();
 
-        // Ресурсы и бронирования
-        const resources = computed(() => store.state.resources);
-        const bookings = computed(() =>
-        store.state.bookings.filter(
-            (booking) => !booking.isCancelled // Исключаем отмененные бронирования
-        )
-        );
+    // Данные для фильтрации
+    const searchQuery = ref('');
+    const selectedResource = ref('');
 
-        // Показывать ли календарь
-        const showCalendar = computed(() => {
-        return selectedResource.value || selectedDate.value;
-        });
+    // Навигация по неделям
+    const currentWeekStart = ref(getMonday(new Date()));
+    
+    // Ресурсы и бронирования
+    const resources = computed(() => store.state.resources);
+    const bookings = computed(() =>
+      store.state.bookings.filter(
+        (booking) => !booking.isCancelled // Исключаем отмененные бронирования
+      )
+    );
 
-        // Фильтрация бронирований
-        const filteredBookings = computed(() => {
-        return bookings.value.filter((booking) => {
-            const resource = store.getters.getResourceNameById(booking.resourceId);
-            const matchesSearch = resource.toLowerCase().includes(searchQuery.value.toLowerCase());
-            const matchesResource = selectedResource.value ? booking.resourceId === selectedResource.value : true;
-            const matchesDate = selectedDate.value ? booking.date === selectedDate.value : true;
-            return matchesSearch && matchesResource && matchesDate;
-        });
-        });
-
-        // Дни недели
-        const days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
-
-        // Временные слоты (с 7:00 до 19:00)
-        const timeSlots = Array.from({ length: 12 }, (_, i) => {
-        const hour = i + 7; // Начинаем с 7:00
-        return `${String(hour).padStart(2, '0')}:00`;
-        });
-
-        // Получение бронирований для ячейки
-        const getBookingsForCell = (day, timeSlot) => {
-        const date = selectedDate.value || new Date().toISOString().split('T')[0];
-        return filteredBookings.value.filter((booking) => {
-            const bookingDate = new Date(booking.date);
-            const bookingDay = days[bookingDate.getDay() - 1]; // Приводим к формату дней недели
-            const bookingTime = booking.time.split(':')[0] + ':00';
-            const bookingEndTime = addHours(booking.time, booking.duration).split(':')[0] + ':00';
-            return (
-            bookingDay === day &&
-            timeSlot >= bookingTime &&
-            timeSlot < bookingEndTime
-            );
-        }).map((booking) => ({
-            ...booking,
-            resourceName: store.getters.getResourceNameById(booking.resourceId),
-            userName: store.getters.getUserNameById(booking.userId), // Используем геттер для получения имени пользователя
-        }));
-        };
-
-        // Класс для ячейки
-        const getCellClass = (day, timeSlot) => {
-        const bookings = getBookingsForCell(day, timeSlot);
-        if (bookings.length > 0) {
-            return bookings.some((booking) => booking.isConfirmed) ? 'confirmed' : 'pending';
-        }
-        return '';
-        };
-
-        // Обработка клика по ячейке
-        const handleCellClick = (day, timeSlot) => {
-        console.log('Выбрана ячейка:', day, timeSlot);
-        };
-
-        // Вспомогательная функция для добавления часов
-        const addHours = (time, hours) => {
-        const [hour, minute] = time.split(':').map(Number);
-        const totalMinutes = hour * 60 + minute + hours * 60;
-        const newHour = Math.floor(totalMinutes / 60) % 24;
-        const newMinute = totalMinutes % 60;
-        return `${String(newHour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`;
-        };
-
+    // Получаем дни текущей недели с датами
+    const days = computed(() => {
+      const daysOfWeek = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+      return daysOfWeek.map((day, index) => {
+        const date = new Date(currentWeekStart.value);
+        date.setDate(date.getDate() + index);
         return {
-        searchQuery,
-        selectedResource,
-        selectedDate,
-        resources,
-        days,
-        timeSlots,
-        showCalendar,
-        getBookingsForCell,
-        getCellClass,
-        handleCellClick,
+          name: day,
+          date: formatDate(date)
         };
-    },
+      });
+    });
+
+    // Диапазон дат недели для отображения
+    const weekRange = computed(() => {
+      const start = new Date(currentWeekStart.value);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      return `${formatDate(start)} - ${formatDate(end)}`;
+    });
+
+    // Временные слоты (с 7:00 до 18:00 – рабочие часы)
+    const timeSlots = Array.from({ length: 12 }, (_, i) => {
+      const hour = i + 7; // Начинаем с 7:00
+      return `${String(hour).padStart(2, '0')}:00`;
+    });
+
+    // Фильтрация бронирований
+    const filteredBookings = computed(() => {
+      const weekDates = days.value.map(day => day.date);
+      return bookings.value.filter((booking) => {
+        const resource = store.getters.getResourceNameById(booking.resourceId);
+        const matchesSearch = resource.toLowerCase().includes(searchQuery.value.toLowerCase());
+        const matchesResource = selectedResource.value ? booking.resourceId === selectedResource.value : true;
+        const matchesDate = weekDates.includes(booking.date);
+        return matchesSearch && matchesResource && matchesDate;
+      });
+    });
+
+    // Получение бронирований для ячейки
+    const getBookingsForCell = (date, timeSlot) => {
+      return filteredBookings.value.filter((booking) => {
+        if (booking.date !== date) return false;
+        
+        const bookingHour = parseInt(booking.time.split(':')[0]);
+        const bookingEndHour = bookingHour + booking.duration;
+        const cellHour = parseInt(timeSlot.split(':')[0]);
+        
+        return cellHour >= bookingHour && cellHour < bookingEndHour;
+      }).map((booking) => ({
+        ...booking,
+        resourceName: store.getters.getResourceNameById(booking.resourceId),
+        userName: store.getters.getUserNameById(booking.userId) || `Пользователь ${booking.userId}`,
+      }));
     };
-  </script>
+
+    // Класс для ячейки
+    const getCellClass = (date, timeSlot) => {
+      const bookings = getBookingsForCell(date, timeSlot);
+      if (bookings.length > 0) {
+        return bookings.some((booking) => booking.isConfirmed) ? 'confirmed' : 'pending';
+      }
+      return 'available';
+    };
+
+    // Обработка клика по ячейке
+    const handleCellClick = (date, timeSlot) => {
+      console.log('Выбрана ячейка:', date, timeSlot);
+    };
+
+    // Навигация по неделям
+    const prevWeek = () => {
+      const date = new Date(currentWeekStart.value);
+      date.setDate(date.getDate() - 7);
+      currentWeekStart.value = date;
+    };
+
+    const nextWeek = () => {
+      const date = new Date(currentWeekStart.value);
+      date.setDate(date.getDate() + 7);
+      currentWeekStart.value = date;
+    };
+
+    // Вспомогательные функции
+    function getMonday(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+      return new Date(d.setDate(diff));
+    }
+
+    function formatDate(date) {
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    return {
+      searchQuery,
+      selectedResource,
+      resources,
+      days,
+      timeSlots,
+      weekRange,
+      getBookingsForCell,
+      getCellClass,
+      handleCellClick,
+      prevWeek,
+      nextWeek
+    };
+  },
+};
+</script>
+
+<style lang="scss" scoped>
+/* Стили остаются без изменений */
+.calendar-page {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: 'Arial', sans-serif;
+}
+
+.filters {
+  margin-bottom: 20px;
   
-  <style lang="scss" scoped>
-  .calendar-page {
-    padding: 20px;
-    max-width: 1200px;
-    margin: 0 auto;
+  h1 {
+    font-size: 24px;
+    margin-bottom: 15px;
+    color: #333;
   }
   
-  .filters {
-    margin-bottom: 20px;
-  
-    h1 {
-      font-size: 24px;
-      margin-bottom: 10px;
+  .filter-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    
+    .search-input,
+    .resource-select {
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      min-width: 200px;
     }
-  
-    .filter-controls {
+    
+    .week-navigation {
       display: flex;
+      align-items: center;
       gap: 10px;
-  
-      .search-input,
-      .resource-select,
-      .date-input {
-        padding: 8px;
-        border: 1px solid #ccc;
+      margin-left: auto;
+      
+      .nav-button {
+        padding: 8px 12px;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
         border-radius: 4px;
-        font-size: 14px;
+        cursor: pointer;
+        font-weight: bold;
+        
+        &:hover {
+          background-color: #e9ecef;
+        }
+      }
+      
+      .week-range {
+        font-weight: 500;
+        min-width: 180px;
+        text-align: center;
       }
     }
   }
+}
+
+.calendar-container {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.calendar {
+  overflow-x: auto;
   
-  .alert-info {
-    background-color: #d1ecf1;
-    color: #0c5460;
-    padding: 0.75rem;
-    border-radius: 8px;
-    border: 1px solid #bee5eb;
-    text-align: center;
-    margin-bottom: 1rem;
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    
+    th, td {
+      border: 1px solid #e0e0e0;
+      padding: 8px;
+      text-align: center;
+    }
+    
+    th {
+      background-color: #f8f9fa;
+      font-weight: 500;
+      color: #555;
+    }
+    
+    td {
+      height: 60px;
+      vertical-align: top;
+      transition: background-color 0.2s;
+      
+      &.time-slot {
+        font-weight: 500;
+        background-color: #f8f9fa;
+      }
+      
+      &.available {
+        background-color: #f8f9fa;
+        cursor: pointer;
+        
+        &:hover {
+          background-color: #e9ecef;
+        }
+      }
+      
+      &.confirmed {
+        background-color: #d4edda;
+      }
+      
+      &.pending {
+        background-color: #fff3cd;
+      }
+    }
+  }
+}
+
+.booking {
+  margin: 2px;
+  padding: 5px;
+  border-radius: 3px;
+  font-size: 12px;
+  text-align: left;
+  
+  .user-name {
+    display: block;
+    font-weight: 500;
+    color: #333;
+  }
+  
+  .resource-name {
+    display: block;
+    font-size: 11px;
+    color: #666;
+  }
+  
+  &.confirmed {
+    background-color: rgba(40, 167, 69, 0.1);
+    border-left: 2px solid #28a745;
+  }
+  
+  &.pending {
+    background-color: rgba(255, 193, 7, 0.1);
+    border-left: 2px solid #ffc107;
+  }
+}
+
+@media (max-width: 768px) {
+  .filter-controls {
+    flex-direction: column;
+    
+    > * {
+      width: 100%;
+    }
+    
+    .week-navigation {
+      margin-left: 0;
+      margin-top: 10px;
+      justify-content: center;
+    }
   }
   
   .calendar {
-    overflow-x: auto;
-  
     table {
-      width: 100%;
-      border-collapse: collapse;
-  
-      th,
       td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        text-align: center;
-      }
-  
-      th {
-        background-color: #f4f4f4;
-      }
-  
-      td {
-        height: 60px;
-        vertical-align: top;
-  
-        &.confirmed {
-          background-color: #d4edda;
-        }
-  
-        &.pending {
-          background-color: #fff3cd;
-        }
-  
-        .booking {
-          background-color: #f8f9fa;
-          padding: 4px;
-          margin: 2px;
-          border-radius: 4px;
-          font-size: 12px;
-  
-          strong {
-            font-weight: bold;
-          }
-        }
+        height: 50px;
+        font-size: 12px;
       }
     }
   }
-  </style>
+  
+  .booking {
+    padding: 3px;
+    
+    .user-name {
+      font-size: 11px;
+    }
+    
+    .resource-name {
+      font-size: 10px;
+    }
+  }
+}
+</style>
