@@ -49,6 +49,22 @@
       <router-view />
     </main>
 
+    <button 
+      v-if="isAuthenticated"
+      @click="toggleMessenger"
+      class="messenger-btn"
+      :class="{ 'has-unread': unreadCount > 0 }"
+    >
+      <i class="bi bi-chat-dots"></i>
+      <span v-if="unreadCount > 0" class="unread-badge">{{ unreadCount }}</span>
+    </button>
+
+    <Messenger 
+      v-if="isAuthenticated"
+      :isOpen="isMessengerOpen" 
+      @close="toggleMessenger"
+    />
+
     <footer class="footer">
       <div class="container">
         <span class="footer-text">by NikaJoun</span>
@@ -58,31 +74,57 @@
 </template>
 
 <script>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
+import Messenger from '@/components/Messenger.vue';
 
 export default {
+  components: { Messenger },
   setup() {
     const store = useStore();
     const router = useRouter();
+    const isMessengerOpen = ref(false);
 
     const isAuthenticated = computed(() => store.state.currentUser !== null);
-
     const isManager = computed(() => store.state.currentUser?.role === 'manager');
-
     const isAdmin = computed(() => store.state.currentUser?.role === 'admin');
+    
+    const unreadCount = computed(() => {
+      if (!isAuthenticated.value) return 0;
+      const currentUserId = store.state.currentUser.id;
+      return (store.state.messages || []).filter(
+        m => m.receiverId === currentUserId && !m.isRead
+      ).length;
+    });
 
-    const logout = () => {
-      store.dispatch('logout');
+    const logout = async () => {
+      await store.dispatch('logout');
       router.push('/');
+      isMessengerOpen.value = false;
     };
+
+    const toggleMessenger = () => {
+      isMessengerOpen.value = !isMessengerOpen.value;
+      if (isMessengerOpen.value) {
+        store.dispatch('markMessagesAsRead');
+      }
+    };
+
+    watch(isAuthenticated, (newVal) => {
+      if (!newVal) {
+        isMessengerOpen.value = false;
+      }
+    });
 
     return {
       isAuthenticated,
       isManager,
       isAdmin,
+      unreadCount,
+      isMessengerOpen,
       logout,
+      toggleMessenger,
     };
   },
 };
@@ -98,6 +140,7 @@ export default {
   flex-direction: column;
   min-height: 100vh;
   background: linear-gradient(135deg, #cacaca, #e5e5e5);
+  position: relative;
 }
 
 .navbar {
@@ -144,6 +187,68 @@ export default {
   .footer-text {
     font-size: 0.9rem;
     font-weight: 400;
+  }
+}
+
+.messenger-btn {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background-color: #0069d9;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  }
+
+  &.has-unread {
+    animation: pulse 1.5s infinite;
+  }
+
+  .unread-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: #dc3545;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+  }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+@media (max-width: 768px) {
+  .messenger-btn {
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    font-size: 1.3rem;
   }
 }
 </style>

@@ -46,12 +46,14 @@
                   :key="booking.id" 
                   class="booking"
                   :class="{
-                    confirmed: booking.isConfirmed,
-                    pending: !booking.isConfirmed
+                    confirmed: booking.isConfirmed && !booking.isExpired,
+                    pending: !booking.isConfirmed && !booking.isExpired,
+                    expired: booking.isExpired
                   }"
                 >
                   <span class="user-name">{{ booking.userName || `Пользователь ${booking.userId}` }}</span>
                   <span class="resource-name">{{ booking.resourceName }}</span>
+                  <span v-if="booking.isExpired" class="expired-badge">Истекло</span>
                 </div>
               </td>
             </tr>
@@ -70,22 +72,20 @@ export default {
   setup() {
     const store = useStore();
 
-    // Данные для фильтрации
     const searchQuery = ref('');
     const selectedResource = ref('');
-
-    // Навигация по неделям
     const currentWeekStart = ref(getMonday(new Date()));
-    
-    // Ресурсы и бронирования
     const resources = computed(() => store.state.resources);
     const bookings = computed(() =>
       store.state.bookings.filter(
-        (booking) => !booking.isCancelled // Исключаем отмененные бронирования
+        (booking) => !booking.isCancelled
       )
     );
+    const isBookingExpired = (booking) => {
+      const bookingDate = new Date(`${booking.date}T${booking.time}`);
+      return bookingDate < new Date();
+    };
 
-    // Получаем дни текущей недели с датами
     const days = computed(() => {
       const daysOfWeek = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
       return daysOfWeek.map((day, index) => {
@@ -98,7 +98,6 @@ export default {
       });
     });
 
-    // Диапазон дат недели для отображения
     const weekRange = computed(() => {
       const start = new Date(currentWeekStart.value);
       const end = new Date(start);
@@ -106,13 +105,11 @@ export default {
       return `${formatDate(start)} - ${formatDate(end)}`;
     });
 
-    // Временные слоты (с 7:00 до 18:00 – рабочие часы)
     const timeSlots = Array.from({ length: 12 }, (_, i) => {
-      const hour = i + 7; // Начинаем с 7:00
+      const hour = i + 7;
       return `${String(hour).padStart(2, '0')}:00`;
     });
 
-    // Фильтрация бронирований
     const filteredBookings = computed(() => {
       const weekDates = days.value.map(day => day.date);
       return bookings.value.filter((booking) => {
@@ -124,7 +121,6 @@ export default {
       });
     });
 
-    // Получение бронирований для ячейки
     const getBookingsForCell = (date, timeSlot) => {
       return filteredBookings.value.filter((booking) => {
         if (booking.date !== date) return false;
@@ -138,24 +134,24 @@ export default {
         ...booking,
         resourceName: store.getters.getResourceNameById(booking.resourceId),
         userName: store.getters.getUserNameById(booking.userId) || `Пользователь ${booking.userId}`,
+        isExpired: isBookingExpired(booking)
       }));
     };
 
-    // Класс для ячейки
     const getCellClass = (date, timeSlot) => {
       const bookings = getBookingsForCell(date, timeSlot);
       if (bookings.length > 0) {
-        return bookings.some((booking) => booking.isConfirmed) ? 'confirmed' : 'pending';
+        if (bookings.some(b => b.isExpired)) return 'expired';
+        if (bookings.some(b => b.isConfirmed)) return 'confirmed';
+        return 'pending';
       }
       return 'available';
     };
 
-    // Обработка клика по ячейке
     const handleCellClick = (date, timeSlot) => {
       console.log('Выбрана ячейка:', date, timeSlot);
     };
 
-    // Навигация по неделям
     const prevWeek = () => {
       const date = new Date(currentWeekStart.value);
       date.setDate(date.getDate() - 7);
@@ -168,11 +164,10 @@ export default {
       currentWeekStart.value = date;
     };
 
-    // Вспомогательные функции
     function getMonday(date) {
       const d = new Date(date);
       const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
       return new Date(d.setDate(diff));
     }
 
@@ -202,7 +197,6 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-/* Стили остаются без изменений */
 .calendar-page {
   padding: 20px;
   max-width: 1200px;
@@ -314,6 +308,10 @@ export default {
       &.pending {
         background-color: #fff3cd;
       }
+      
+      &.expired {
+        background-color: #f8d7da;
+      }
     }
   }
 }
@@ -337,6 +335,13 @@ export default {
     color: #666;
   }
   
+  .expired-badge {
+    display: block;
+    font-size: 10px;
+    color: #dc3545;
+    font-style: italic;
+  }
+  
   &.confirmed {
     background-color: rgba(40, 167, 69, 0.1);
     border-left: 2px solid #28a745;
@@ -345,6 +350,11 @@ export default {
   &.pending {
     background-color: rgba(255, 193, 7, 0.1);
     border-left: 2px solid #ffc107;
+  }
+  
+  &.expired {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-left: 2px solid #dc3545;
   }
 }
 

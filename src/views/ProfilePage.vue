@@ -95,6 +95,11 @@ export default {
     const showCancelModal = ref(false);
     const selectedBookingId = ref(null);
 
+    const isBookingExpired = (booking) => {
+      const bookingDate = new Date(`${booking.date}T${booking.time}`);
+      return bookingDate < new Date();
+    };
+
     const openCancelModal = (bookingId) => {
       selectedBookingId.value = bookingId;
       showCancelModal.value = true;
@@ -118,7 +123,8 @@ export default {
         (booking) =>
           booking.userId === store.state.currentUser.id &&
           !booking.isCancelled &&
-          !booking.isCompleted
+          !booking.isCompleted &&
+          !isBookingExpired(booking)
       );
     });
 
@@ -127,7 +133,7 @@ export default {
       return store.state.bookings.filter(
         (booking) =>
           booking.userId === store.state.currentUser.id &&
-          (booking.isCancelled || booking.isCompleted)
+          (booking.isCancelled || booking.isCompleted || isBookingExpired(booking))
       );
     });
 
@@ -138,12 +144,14 @@ export default {
     const getStatusClass = (booking) => {
       if (booking.isCompleted) return 'text-success';
       if (booking.isCancelled) return 'text-danger';
+      if (isBookingExpired(booking)) return 'text-secondary';
       return 'text-warning';
     };
 
     const getStatusText = (booking) => {
       if (booking.isCompleted) return 'Завершено';
       if (booking.isCancelled) return 'Отменено';
+      if (isBookingExpired(booking)) return 'Истекло';
       return 'Ожидает подтверждения';
     };
 
@@ -269,15 +277,19 @@ export default {
 }
 
 .text-success {
-  color: green;
+  color: #28a745;
 }
 
 .text-warning {
-  color: orange;
+  color: #ffc107;
 }
 
 .text-danger {
-  color: red;
+  color: #dc3545;
+}
+
+.text-secondary {
+  color: #6c757d;
 }
 
 .no-bookings-message {

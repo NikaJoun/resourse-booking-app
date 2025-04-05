@@ -6,6 +6,7 @@ import 'bootstrap/dist/css/bootstrap.css';
 import 'bootstrap'
 import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
+import 'bootstrap-icons/font/bootstrap-icons.css'
 
 const app = createApp(App);
 app.use(store);

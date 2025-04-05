@@ -27,6 +27,9 @@
             :class="{ active: selectedResource?.id === resource.id }"
           >
             {{ resource.name }}
+            <span class="working-hours" v-if="resource.workingHours">
+              ({{ resource.workingHours.start }} - {{ resource.workingHours.end }})
+            </span>
           </button>
         </div>
         <button @click="step = 1" class="btn-back">Назад</button>
@@ -38,17 +41,26 @@
           @date-selected="onDateSelected"
           @time-selected="onTimeSelected"
           :disabledDates="disabledDates"
+          :minDate="minSelectableDate"
+          :maxDate="maxSelectableDate"
+          :disabledTimeSlots="disabledTimeSlots"
         />
         <div class="duration-select">
           <label for="duration">Продолжительность (часы):</label>
           <select id="duration" v-model="selectedDuration">
-            <option v-for="hour in availableDurations" :key="hour" :value="hour">
-              {{ hour }}
+            <option 
+              v-for="hour in availableDurations" 
+              :key="hour" 
+              :value="hour"
+              :disabled="isDurationDisabled(hour)"
+            >
+              {{ hour }} {{ hour === 1 ? 'час' : hour < 5 ? 'часа' : 'часов' }}
             </option>
           </select>
+          <div v-if="durationError" class="error-message">{{ durationError }}</div>
         </div>
         <button @click="step = 2" class="btn-back">Назад</button>
-        <button @click="step = 4" class="btn-next">Далее</button>
+        <button @click="validateStep3" class="btn-next">Далее</button>
       </div>
 
       <div v-if="step === 4" class="step">
@@ -57,7 +69,8 @@
           <p><strong>Ресурс:</strong> {{ selectedResource.name }}</p>
           <p><strong>Дата:</strong> {{ selectedDate }}</p>
           <p><strong>Время:</strong> {{ selectedTime }}</p>
-          <p><strong>Продолжительность:</strong> {{ selectedDuration }} час(ов)</p>
+          <p><strong>Продолжительность:</strong> {{ selectedDuration }} {{ selectedDuration === 1 ? 'час' : selectedDuration < 5 ? 'часа' : 'часов' }}</p>
+          <p><strong>Окончание:</strong> {{ calculateEndTime() }}</p>
         </div>
         <button @click="confirmBooking" class="btn-confirm">Подтвердить</button>
         <button @click="step = 3" class="btn-back">Назад</button>
@@ -75,7 +88,7 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toastification';
 import CustomCalendar from '@/components/CustomCalendar.vue';
@@ -89,7 +102,6 @@ export default {
     const toast = useToast();
 
     const step = ref(1);
-
     const selectedResourceType = ref('');
     const selectedResource = ref(null);
     const selectedDate = ref('');
@@ -97,6 +109,12 @@ export default {
     const selectedDuration = ref(1);
     const errorMessage = ref('');
     const successMessage = ref('');
+    const durationError = ref('');
+
+    const defaultWorkingHours = { start: '07:00', end: '19:00' };
+    
+    const minSelectableDate = new Date().toISOString().split('T')[0];
+    const maxSelectableDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     const resourceTypes = [
       { value: 'photographer', label: 'Фотограф' },
@@ -104,13 +122,14 @@ export default {
       { value: 'equipment', label: 'Оборудование' },
     ];
 
-    const availableDurations = Array.from({ length: 8 }, (_, i) => i + 1);
-
     const filteredResources = computed(() => {
       if (!selectedResourceType.value) return [];
       return store.state.resources.filter(
         (resource) => resource.type === selectedResourceType.value
-      );
+      ).map(resource => ({
+        ...resource,
+        workingHours: resource.workingHours || defaultWorkingHours
+      }));
     });
 
     const disabledDates = computed(() => {
@@ -120,6 +139,60 @@ export default {
       );
       return bookings.map((booking) => booking.date);
     });
+
+    const disabledTimeSlots = computed(() => {
+      if (!selectedResource.value || !selectedDate.value) return [];
+      
+      const currentDate = new Date().toISOString().split('T')[0];
+      const isToday = selectedDate.value === currentDate;
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      
+      const workingHours = selectedResource.value.workingHours || defaultWorkingHours;
+      const [startHour, startMinute] = workingHours.start.split(':').map(Number);
+      const [endHour, endMinute] = workingHours.end.split(':').map(Number);
+      
+      const disabledSlots = [];
+      
+      if (isToday) {
+        for (let hour = startHour; hour <= endHour; hour++) {
+          if (hour < currentHour || (hour === currentHour && currentMinute > 0)) {
+            disabledSlots.push(`${String(hour).padStart(2, '0')}:00`);
+          }
+        }
+      }
+      
+      for (let hour = 0; hour < 24; hour++) {
+        if (hour < startHour || hour >= endHour) {
+          disabledSlots.push(`${String(hour).padStart(2, '0')}:00`);
+        }
+      }
+      
+      return disabledSlots;
+    });
+
+    const availableDurations = computed(() => {
+      if (!selectedTime.value || !selectedResource.value) return Array.from({ length: 8 }, (_, i) => i + 1);
+      
+      const workingHours = selectedResource.value.workingHours || defaultWorkingHours;
+      const [startHour, startMinute] = workingHours.start.split(':').map(Number);
+      const [endHour, endMinute] = workingHours.end.split(':').map(Number);
+      const [selectedHour] = selectedTime.value.split(':').map(Number);
+      
+      const maxPossibleDuration = endHour - selectedHour;
+      return Array.from({ length: Math.min(8, maxPossibleDuration) }, (_, i) => i + 1);
+    });
+
+    const isDurationDisabled = (duration) => {
+      if (!selectedTime.value || !selectedResource.value) return false;
+      
+      const workingHours = selectedResource.value.workingHours || defaultWorkingHours;
+      const [selectedHour] = selectedTime.value.split(':').map(Number);
+      const [endHour] = workingHours.end.split(':').map(Number);
+      
+      return selectedHour + duration > endHour;
+    };
 
     const selectResourceType = (type) => {
       selectedResourceType.value = type;
@@ -133,10 +206,50 @@ export default {
 
     const onDateSelected = (date) => {
       selectedDate.value = date;
+      selectedTime.value = '09:00';
+      validateDuration();
     };
 
     const onTimeSelected = (time) => {
       selectedTime.value = time;
+      validateDuration();
+    };
+
+    const validateDuration = () => {
+      if (isDurationDisabled(selectedDuration.value)) {
+        selectedDuration.value = 1;
+        durationError.value = 'Выбранная продолжительность выходит за рабочие часы';
+      } else {
+        durationError.value = '';
+      }
+    };
+
+    const validateStep3 = () => {
+      if (!selectedDate.value) {
+        errorMessage.value = 'Пожалуйста, выберите дату';
+        return;
+      }
+      
+      if (!selectedTime.value) {
+        errorMessage.value = 'Пожалуйста, выберите время';
+        return;
+      }
+      
+      if (isDurationDisabled(selectedDuration.value)) {
+        errorMessage.value = 'Недопустимая продолжительность бронирования';
+        return;
+      }
+      
+      errorMessage.value = '';
+      step.value = 4;
+    };
+
+    const calculateEndTime = () => {
+      if (!selectedTime.value || !selectedDuration.value) return '';
+      
+      const [hours, minutes] = selectedTime.value.split(':').map(Number);
+      const endHours = hours + selectedDuration.value;
+      return `${String(endHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     };
 
     const confirmBooking = async () => {
@@ -147,6 +260,7 @@ export default {
         time: selectedTime.value,
         duration: selectedDuration.value,
         userId: store.state.currentUser.id,
+        isConfirmed: false,
       };
 
       try {
@@ -168,7 +282,10 @@ export default {
       selectedTime.value = '09:00';
       selectedDuration.value = 1;
       errorMessage.value = '';
+      successMessage.value = '';
     };
+
+    watch(selectedDuration, validateDuration);
 
     return {
       step,
@@ -181,13 +298,20 @@ export default {
       availableDurations,
       filteredResources,
       disabledDates,
+      disabledTimeSlots,
+      minSelectableDate,
+      maxSelectableDate,
       errorMessage,
       successMessage,
+      durationError,
       selectResourceType,
       selectResource,
       onDateSelected,
       onTimeSelected,
+      validateStep3,
       confirmBooking,
+      calculateEndTime,
+      isDurationDisabled,
     };
   },
 };
@@ -378,6 +502,18 @@ export default {
     color: #155724;
     border: 1px solid #c3e6cb;
   }
+}
+
+.working-hours {
+  font-size: 0.8em;
+  color: #6c757d;
+  margin-left: 0.5em;
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 0.8em;
+  margin-top: 0.5em;
 }
 
 @media (max-width: 576px) {
