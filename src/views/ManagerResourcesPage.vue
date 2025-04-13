@@ -53,6 +53,7 @@
                 <strong>Время:</strong> {{ booking.time }} <br />
                 <strong>Ресурс:</strong> {{ getResourceName(booking.resourceId) }} <br />
                 <strong>Продолжительность:</strong> {{ booking.duration }} час(ов) <br />
+                <strong>Пользователь:</strong> {{ getUserName(booking.userId) }} <br />
                 <strong>Статус:</strong>
                 <span :class="booking.isConfirmed ? 'text-success' : 'text-warning'">
                   {{ booking.isConfirmed ? 'Подтверждено' : 'Ожидает подтверждения' }}
@@ -109,6 +110,7 @@
                 <strong>Время:</strong> {{ booking.time }} <br />
                 <strong>Ресурс:</strong> {{ getResourceName(booking.resourceId) }} <br />
                 <strong>Продолжительность:</strong> {{ booking.duration }} час(ов) <br />
+                <strong>Пользователь:</strong> {{ getUserName(booking.userId) }} <br />
                 <strong>Статус:</strong>
                 <span :class="getStatusClass(booking)">
                   {{ getStatusText(booking) }}
@@ -128,14 +130,14 @@
 <script>
 import { computed, ref } from 'vue';
 import { useStore } from 'vuex';
+import { useToast } from 'vue-toastification';
 
 export default {
   setup() {
     const store = useStore();
-
+    const toast = useToast(); 
     const activeTab = ref('resources');
 
-    // Фильтры для бронирований
     const selectedResourceFilter = ref('');
     const dateFrom = ref('');
     const dateTo = ref('');
@@ -157,23 +159,25 @@ export default {
         managedResourceIds.includes(booking.resourceId)
       );
     });
+    
+    const getUserName = (userId) => {
+      const user = store.state.users.find(u => u.id === userId);
+      return user ? user.name : 'Неизвестный пользователь';
+    };
 
     const filteredAllBookings = computed(() => {
       return allBookings.value.filter(booking => {
-        // Фильтр по ресурсу
         if (selectedResourceFilter.value && booking.resourceId !== selectedResourceFilter.value) {
           return false;
         }
         
-        // Фильтр по дате
         if (dateFrom.value && booking.date < dateFrom.value) {
           return false;
         }
         if (dateTo.value && booking.date > dateTo.value) {
           return false;
         }
-        
-        // Фильтр по статусу
+
         if (selectedStatusFilter.value) {
           if (selectedStatusFilter.value === 'pending' && booking.isConfirmed) {
             return false;
@@ -197,12 +201,24 @@ export default {
       return store.getters.getResourceNameById(resourceId);
     };
 
-    const confirmBooking = (bookingId) => {
-      store.commit('CONFIRM_BOOKING', bookingId);
+    const confirmBooking = async (bookingId) => {
+      try {
+        await store.dispatch('confirmBooking', bookingId);
+        toast.success('Бронирование подтверждено');
+      } catch (error) {
+        toast.error('Ошибка при подтверждении бронирования');
+        console.error(error);
+      }
     };
 
-    const rejectBooking = (bookingId) => {
-      store.commit('REMOVE_BOOKING', bookingId);
+    const rejectBooking = async (bookingId) => {
+      try {
+        await store.dispatch('cancelBooking', bookingId);
+        toast.success('Бронирование отклонено');
+      } catch (error) {
+        toast.error('Ошибка при отклонении бронирования');
+        console.error(error);
+      }
     };
 
     const getStatusClass = (booking) => {
@@ -238,6 +254,7 @@ export default {
       getStatusClass,
       getStatusText,
       formatDate,
+      getUserName,
     };
   },
 };

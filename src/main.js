@@ -12,8 +12,12 @@ const app = createApp(App);
 app.use(store);
 app.use(router);
 app.use(Toast, {
-    position: 'top-right',
-    timeout: 3000,
-  });
+  position: 'top-right',
+  timeout: 5000,
+  closeOnClick: true,
+  pauseOnFocusLoss: true,
+  pauseOnHover: true,
+  draggable: true,
+});
 
 app.mount('#app')

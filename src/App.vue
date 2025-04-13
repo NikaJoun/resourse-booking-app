@@ -21,6 +21,36 @@
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto">
             <template v-if="isAuthenticated">
+              <li class="nav-item dropdown me-2">
+                <a
+                  class="nav-link position-relative"
+                  href="#"
+                  id="notificationDropdown"
+                  role="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                >
+                  <i class="bi bi-bell"></i>
+                  <span v-if="unreadNotificationCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                    {{ unreadNotificationCount }}
+                  </span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end notification-dropdown" aria-labelledby="notificationDropdown">
+                  <li v-if="notifications.length === 0" class="dropdown-item text-muted">Нет уведомлений</li>
+                  <li v-for="(n, index) in notifications.slice(0, 5)" :key="index" class="dropdown-item notification-item" :class="{ 'unread': !n.isRead }">
+                    <div @click="markAsRead(n.id)">
+                      <p class="notification-text">{{ n.text }}</p>
+                      <small class="notification-time">{{ formatNotificationTime(n.timestamp) }}</small>
+                    </div>
+                  </li>
+                  <li>
+                    <router-link to="/notifications" class="dropdown-item text-center text-primary" @click="markAllAsRead">
+                      Показать все уведомления
+                    </router-link>
+                  </li>
+                </ul>
+              </li>
+
               <li class="nav-item">
                 <router-link to="/profile" class="nav-link">Профиль</router-link>
               </li>
@@ -78,6 +108,7 @@ import { computed, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import Messenger from '@/components/Messenger.vue';
+import { useToast } from 'vue-toastification';
 
 export default {
   components: { Messenger },
@@ -85,6 +116,7 @@ export default {
     const store = useStore();
     const router = useRouter();
     const isMessengerOpen = ref(false);
+    const toast = useToast();
 
     const isAuthenticated = computed(() => store.state.currentUser !== null);
     const isManager = computed(() => store.state.currentUser?.role === 'manager');
@@ -97,6 +129,22 @@ export default {
         m => m.receiverId === currentUserId && !m.isRead
       ).length;
     });
+
+    const notifications = computed(() => store.getters.getNotificationsForCurrentUser);
+    const unreadNotificationCount = computed(() => store.getters.getUnreadNotificationCount);
+
+    const formatNotificationTime = (timestamp) => {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const markAsRead = (notificationId) => {
+      store.dispatch('markNotificationAsRead', notificationId);
+    };
+    
+    const markAllAsRead = () => {
+      store.dispatch('markAllNotificationsAsRead');
+    };
 
     const logout = async () => {
       await store.dispatch('logout');
@@ -117,12 +165,60 @@ export default {
       }
     });
 
+    watch(
+      () => store.state.bookings,
+      (newBookings, oldBookings) => {
+        if (!oldBookings) return;
+
+        const currentUserId = store.state.currentUser?.id;
+        newBookings.forEach(booking => {
+          const old = oldBookings.find(b => b.id === booking.id);
+          if (
+            booking.status === 'confirmed' &&
+            old?.status !== 'confirmed' &&
+            booking.userId === currentUserId
+          ) {
+            const msg = 'Ваше бронирование подтверждено!';
+            notifications.value.push(msg);
+            toast.success(msg);
+          }
+        });
+      },
+      { deep: true }
+    );
+
+    watch(
+      () => store.state.messages,
+      (newMessages, oldMessages) => {
+        if (!oldMessages) return;
+
+        const currentUserId = store.state.currentUser?.id;
+        const newIncoming = newMessages.filter(
+          m =>
+            m.receiverId === currentUserId &&
+            !oldMessages.some(om => om.id === m.id)
+        );
+
+        if (newIncoming.length > 0 && !isMessengerOpen.value) {
+          const msg = `Новое сообщение от ${newIncoming[0].senderName}`;
+          notifications.value.push(msg);
+          toast.info(msg);
+        }
+      },
+      { deep: true }
+    );
+
     return {
       isAuthenticated,
       isManager,
       isAdmin,
       unreadCount,
       isMessengerOpen,
+      notifications,
+      unreadNotificationCount,
+      formatNotificationTime,
+      markAsRead,
+      markAllAsRead,
       logout,
       toggleMessenger,
     };
@@ -169,6 +265,10 @@ export default {
       color: #ffffff;
       font-weight: 600;
     }
+  }
+
+  .bi-bell {
+    font-size: 1.2rem;
   }
 }
 
@@ -234,6 +334,31 @@ export default {
     font-size: 0.75rem;
     font-weight: bold;
   }
+}
+
+.notification-dropdown {
+  width: 350px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.notification-item.unread {
+  background-color: #f0f7ff;
+}
+
+.notification-text {
+  margin-bottom: 0.25rem;
+  color: #333;
+}
+
+.notification-time {
+  color: #6c757d;
+  font-size: 0.8rem;
 }
 
 @keyframes pulse {

@@ -5,6 +5,7 @@ import ProfilePage from '@/views/ProfilePage.vue';
 import AdminPanel from '@/views/AdminPanel.vue';
 import ManagerResourcesPage from '@/views/ManagerResourcesPage.vue';
 import FullCalendar from '@/views/FullCalendar.vue';
+import NotificationsPage from '@/views/NotificationsPage.vue';
 import store from '@/store';
 
 const routes = [
@@ -29,6 +30,12 @@ const routes = [
     path: '/manager/resources',
     component: ManagerResourcesPage,
     meta: { requiresAuth: true, role: 'manager' },
+  },
+  {
+    path: '/notifications',
+    name: 'notifications',
+    component: NotificationsPage,
+    meta: { requiresAuth: true }
   },
 ];
 

@@ -15,22 +15,24 @@ export default createStore({
     bookings: JSON.parse(localStorage.getItem('bookings')) || [
       {
         id: 1,
-        resourceId: 1, // Фотограф Иван
+        resourceId: 1,
         date: '2025-03-17',
         time: '10:00',
         duration: 2,
-        userId: 3, // Обычный пользователь
-        isConfirmed: false, // Ожидает подтверждения
+        userId: 3,
+        isConfirmed: false,
       },
     ],
     currentUser: JSON.parse(localStorage.getItem('currentUser')) || null,
     messages: JSON.parse(localStorage.getItem('messages')) || [],
-    groupMessages: JSON.parse(localStorage.getItem('groupMessages')) || []
+    groupMessages: JSON.parse(localStorage.getItem('groupMessages')) || [],
+    notifications: JSON.parse(localStorage.getItem('notifications')) || [],
   },
+
   mutations: {
     SET_USERS(state, users) {
       state.users = users;
-      localStorage.setItem('users', JSON.stringify(state.users));
+      localStorage.setItem('users', JSON.stringify(users));
     },
     ADD_USER(state, user) {
       user.id = Date.now();
@@ -38,32 +40,20 @@ export default createStore({
       localStorage.setItem('users', JSON.stringify(state.users));
     },
     UPDATE_USER(state, updatedUser) {
-      const index = state.users.findIndex((user) => user.id === updatedUser.id);
+      const index = state.users.findIndex(user => user.id === updatedUser.id);
       if (index !== -1) {
         state.users.splice(index, 1, updatedUser);
-        localStorage.setItem('users', JSON.stringify(state.users)); 
+        localStorage.setItem('users', JSON.stringify(state.users));
       }
     },
     REMOVE_USER(state, userId) {
-      state.users = state.users.filter((user) => user.id !== userId);
+      state.users = state.users.filter(user => user.id !== userId);
       localStorage.setItem('users', JSON.stringify(state.users));
     },
+
     SET_RESOURCES(state, resources) {
       state.resources = resources;
-      localStorage.setItem('resources', JSON.stringify(state.resources));
-    },
-    ADD_BOOKING(state, booking) {
-      const newBooking = { ...booking, id: Date.now() };
-      state.bookings.push(newBooking);
-      localStorage.setItem('bookings', JSON.stringify(state.bookings));
-    },
-    SET_CURRENT_USER(state, user) {
-      state.currentUser = user;
-      localStorage.setItem('currentUser', JSON.stringify(user));
-    },
-    REMOVE_BOOKING(state, bookingId) {
-      state.bookings = state.bookings.filter((booking) => booking.id !== bookingId);
-      localStorage.setItem('bookings', JSON.stringify(state.bookings));
+      localStorage.setItem('resources', JSON.stringify(resources));
     },
     ADD_RESOURCE(state, resource) {
       resource.id = Date.now();
@@ -71,30 +61,50 @@ export default createStore({
       localStorage.setItem('resources', JSON.stringify(state.resources));
     },
     UPDATE_RESOURCE(state, updatedResource) {
-      const index = state.resources.findIndex((resource) => resource.id === updatedResource.id);
+      const index = state.resources.findIndex(r => r.id === updatedResource.id);
       if (index !== -1) {
         state.resources.splice(index, 1, updatedResource);
         localStorage.setItem('resources', JSON.stringify(state.resources));
       }
     },
     REMOVE_RESOURCE(state, resourceId) {
-      state.resources = state.resources.filter((resource) => resource.id !== resourceId);
+      state.resources = state.resources.filter(r => r.id !== resourceId);
       localStorage.setItem('resources', JSON.stringify(state.resources));
     },
+
+    SET_BOOKINGS(state, bookings) {
+      state.bookings = bookings;
+      localStorage.setItem('bookings', JSON.stringify(bookings));
+    },
+    ADD_BOOKING(state, booking) {
+      const newBooking = { ...booking, id: Date.now() };
+      state.bookings.push(newBooking);
+      localStorage.setItem('bookings', JSON.stringify(state.bookings));
+    },
     CONFIRM_BOOKING(state, bookingId) {
-      const booking = state.bookings.find((booking) => booking.id === bookingId);
+      const booking = state.bookings.find(b => b.id === bookingId);
       if (booking) {
         booking.isConfirmed = true;
         localStorage.setItem('bookings', JSON.stringify(state.bookings));
       }
     },
     CANCEL_BOOKING(state, bookingId) {
-      const booking = state.bookings.find((booking) => booking.id === bookingId);
+      const booking = state.bookings.find(b => b.id === bookingId);
       if (booking) {
         booking.isCancelled = true;
         localStorage.setItem('bookings', JSON.stringify(state.bookings));
       }
     },
+    REMOVE_BOOKING(state, bookingId) {
+      state.bookings = state.bookings.filter(b => b.id !== bookingId);
+      localStorage.setItem('bookings', JSON.stringify(state.bookings));
+    },
+
+    SET_CURRENT_USER(state, user) {
+      state.currentUser = user;
+      localStorage.setItem('currentUser', JSON.stringify(user));
+    },
+
     ADD_MESSAGE(state, message) {
       message.id = Date.now();
       message.timestamp = new Date().toISOString();
@@ -103,6 +113,14 @@ export default createStore({
     },
     SET_MESSAGES(state, messages) {
       state.messages = messages;
+      localStorage.setItem('messages', JSON.stringify(messages));
+    },
+    MARK_MESSAGES_AS_READ(state, { userId, currentUserId }) {
+      state.messages = state.messages.map(msg =>
+        msg.receiverId === currentUserId && msg.senderId === userId && !msg.isRead
+          ? { ...msg, isRead: true }
+          : msg
+      );
       localStorage.setItem('messages', JSON.stringify(state.messages));
     },
     ADD_GROUP_MESSAGE(state, message) {
@@ -113,19 +131,27 @@ export default createStore({
     },
     SET_GROUP_MESSAGES(state, messages) {
       state.groupMessages = messages;
-      localStorage.setItem('groupMessages', JSON.stringify(state.groupMessages));
+      localStorage.setItem('groupMessages', JSON.stringify(messages));
     },
-    MARK_MESSAGES_AS_READ(state, { userId, currentUserId }) {
-      state.messages = state.messages.map(msg => {
-        if (msg.receiverId === currentUserId && 
-            msg.senderId === userId && 
-            !msg.isRead) {
-          return { ...msg, isRead: true };
-        }
-        return msg;
-      });
-      localStorage.setItem('messages', JSON.stringify(state.messages));
-    }
+    ADD_NOTIFICATION(state, notification) {
+      notification.id = Date.now();
+      notification.timestamp = new Date().toISOString();
+      notification.isRead = false;
+      state.notifications.push(notification);
+      localStorage.setItem('notifications', JSON.stringify(state.notifications));
+    },
+    
+    MARK_NOTIFICATION_AS_READ(state, notificationId) {
+      const notification = state.notifications.find(n => n.id === notificationId);
+      if (notification) {
+        notification.isRead = true;
+        localStorage.setItem('notifications', JSON.stringify(state.notifications));
+      }
+    },
+    MARK_ALL_NOTIFICATIONS_AS_READ(state) {
+      state.notifications = state.notifications.map(n => ({ ...n, isRead: true }));
+      localStorage.setItem('notifications', JSON.stringify(state.notifications));
+    },
   },
   actions: {
     login({ commit }, user) {
@@ -134,18 +160,17 @@ export default createStore({
     logout({ commit }) {
       commit('SET_CURRENT_USER', null);
     },
-    addBooking({ commit, getters }, booking) {
-      const isBooked = getters.isResourceBooked(
-        booking.resourceId,
-        booking.date,
-        booking.time,
-        booking.duration
-      );
-  
-      if (isBooked) {
-        throw new Error('Этот слот уже занят!');
-      } else {
-        commit('ADD_BOOKING', booking);
+    addBooking({ commit, state }, booking) {
+      commit('ADD_BOOKING', booking);
+      const resource = state.resources.find(r => r.id === booking.resourceId);
+      const user = state.users.find(u => u.id === booking.userId);
+      
+      if (resource?.managerId) {
+        commit('ADD_NOTIFICATION', {
+          userId: resource.managerId,
+          text: `Новое бронирование "${resource?.name || 'ресурс'}" на ${booking.date} в ${booking.time} от ${user?.username || 'неизвестный'}.`,
+          type: 'new-booking'
+        });
       }
     },
     addResource({ commit, state }, resource) {
@@ -160,6 +185,53 @@ export default createStore({
     removeResource({ commit }, resourceId) {
       commit('REMOVE_RESOURCE', resourceId);
     },
+    confirmBooking({ commit, state }, bookingId) {
+      commit('CONFIRM_BOOKING', bookingId);
+      const booking = state.bookings.find(b => b.id === bookingId);
+      if (booking) {
+        const resource = state.resources.find(r => r.id === booking.resourceId);
+        const user = state.users.find(u => u.id === booking.userId);
+        
+        // Уведомление для пользователя
+        commit('ADD_NOTIFICATION', {
+          userId: booking.userId,
+          text: `Ваше бронирование "${resource?.name || 'ресурс'}" на ${booking.date} в ${booking.time} подтверждено.`,
+          type: 'booking-confirmed'
+        });
+        
+        // Уведомление для менеджера (если есть)
+        if (resource?.managerId) {
+          commit('ADD_NOTIFICATION', {
+            userId: resource.managerId,
+            text: `Вы подтвердили бронирование "${resource?.name || 'ресурс'}" пользователем ${user?.username || 'неизвестный'}.`,
+            type: 'manager-confirmation'
+          });
+        }
+      }
+    },
+    cancelBooking({ commit, state }, bookingId) {
+      const booking = state.bookings.find(b => b.id === bookingId);
+      if (booking) {
+        commit('CANCEL_BOOKING', bookingId);
+        const resource = state.resources.find(r => r.id === booking.resourceId);
+        const user = state.users.find(u => u.id === booking.userId);
+        
+        commit('ADD_NOTIFICATION', {
+          userId: booking.userId,
+          text: `Ваше бронирование "${resource?.name || 'ресурс'}" на ${booking.date} в ${booking.time} отменено.`,
+          type: 'booking-cancelled'
+        });
+        
+        if (resource?.managerId) {
+          commit('ADD_NOTIFICATION', {
+            userId: resource.managerId,
+            text: `Подтвержденное бронирование "${resource?.name || 'ресурс'}" отменено пользователем ${user?.username || 'неизвестный'}.`,
+            type: 'booking-cancelled-manager'
+          });
+        }
+      }
+    },
+
     async sendMessage({ commit }, message) {
       commit('ADD_MESSAGE', message);
     },
@@ -176,104 +248,111 @@ export default createStore({
     },
     markMessagesAsRead({ commit, state }, userId) {
       if (state.currentUser) {
-        commit('MARK_MESSAGES_AS_READ', { 
-          userId, 
-          currentUserId: state.currentUser.id 
+        commit('MARK_MESSAGES_AS_READ', {
+          userId,
+          currentUserId: state.currentUser.id,
         });
       }
-    }
+    },
+    addNotification({ commit }, notification) {
+      commit('ADD_NOTIFICATION', notification);
+    },
+    markNotificationAsRead({ commit }, notificationId) {
+      commit('MARK_NOTIFICATION_AS_READ', notificationId);
+    },
+    markAllNotificationsAsRead({ commit }) {
+      commit('MARK_ALL_NOTIFICATIONS_AS_READ');
+    },
   },
+
   getters: {
-    isAdmin: (state) => state.currentUser?.role === 'admin',
-    isResourceManager: (state) => state.currentUser?.role === 'manager',
-    isResourceBooked: (state) => (resourceId, date, time, duration) => {
-      return state.bookings.some((booking) => {
-        if (
-          booking.resourceId === resourceId &&
-          booking.date === date
-        ) {
+    isAdmin: state => state.currentUser?.role === 'admin',
+    isResourceManager: state => state.currentUser?.role === 'manager',
+
+    isResourceBooked: state => (resourceId, date, time, duration) => {
+      return state.bookings.some(booking => {
+        if (booking.resourceId === resourceId && booking.date === date) {
           const bookingStart = new Date(`${booking.date}T${booking.time}:00`);
           const bookingEnd = new Date(bookingStart.getTime() + booking.duration * 60 * 60 * 1000);
-  
-          const newBookingStart = new Date(`${date}T${time}:00`);
-          const newBookingEnd = new Date(newBookingStart.getTime() + duration * 60 * 60 * 1000);
-  
+          const newStart = new Date(`${date}T${time}:00`);
+          const newEnd = new Date(newStart.getTime() + duration * 60 * 60 * 1000);
           return (
-            (newBookingStart >= bookingStart && newBookingStart < bookingEnd) ||
-            (newBookingEnd > bookingStart && newBookingEnd <= bookingEnd) ||
-            (newBookingStart <= bookingStart && newBookingEnd >= bookingEnd)
+            (newStart >= bookingStart && newStart < bookingEnd) ||
+            (newEnd > bookingStart && newEnd <= bookingEnd) ||
+            (newStart <= bookingStart && newEnd >= bookingEnd)
           );
         }
         return false;
       });
     },
-    getResourceNameById: (state) => (resourceId) => {
-      const resource = state.resources.find((resource) => resource.id === resourceId);
+
+    getResourceNameById: state => resourceId => {
+      const resource = state.resources.find(r => r.id === resourceId);
       return resource ? resource.name : 'Неизвестный ресурс';
     },
-    managedResources: (state) => {
+
+    managedResources: state => {
       if (!state.currentUser || state.currentUser.role !== 'manager') return [];
       return state.resources.filter(
-        (resource) =>
-          resource.type === state.currentUser.managedResourceType && 
-          resource.managerId === state.currentUser.id 
+        r => r.type === state.currentUser.managedResourceType && r.managerId === state.currentUser.id
       );
     },
+
     pendingBookings: (state, getters) => {
       if (!state.currentUser || state.currentUser.role !== 'manager') return [];
-      const managedResourceIds = getters.managedResources.map((resource) => resource.id);
-      return state.bookings.filter(
-        (booking) =>
-          managedResourceIds.includes(booking.resourceId) &&
-          !booking.isConfirmed 
-      );
+      const managedResourceIds = getters.managedResources.map(r => r.id);
+      return state.bookings.filter(b => managedResourceIds.includes(b.resourceId) && !b.isConfirmed);
     },
-    getUserNameById: (state) => (userId) => {
-      const user = state.users.find((user) => user.id === userId);
+
+    getUserNameById: state => userId => {
+      const user = state.users.find(u => u.id === userId);
       return user ? user.username : `Пользователь ${userId}`;
     },
-    getMessagesForUser: (state) => (userId) => {
+
+    getMessagesForUser: state => userId => {
       const currentUserId = state.currentUser?.id;
       if (!currentUserId) return [];
-      
-      return state.messages.filter(
-        message => 
-          (message.senderId === currentUserId && message.receiverId === userId) ||
-          (message.senderId === userId && message.receiverId === currentUserId)
-      ).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      return state.messages
+        .filter(
+          m =>
+            (m.senderId === currentUserId && m.receiverId === userId) ||
+            (m.senderId === userId && m.receiverId === currentUserId)
+        )
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     },
-    getOtherUsers: (state) => {
+
+    getOtherUsers: state => {
       const currentUserId = state.currentUser?.id;
-      if (!currentUserId) return [];
-      
-      return state.users.filter(user => user.id !== currentUserId);
+      return currentUserId ? state.users.filter(u => u.id !== currentUserId) : [];
     },
-    getLastMessageForUser: (state, getters) => (userId) => {
+
+    getLastMessageForUser: (state, getters) => userId => {
       const messages = getters.getMessagesForUser(userId);
       return messages.length > 0 ? messages[messages.length - 1] : null;
     },
-    getUnreadCountForUser: (state, getters) => (userId) => {
+
+    getUnreadCountForUser: (state, getters) => userId => {
       const messages = getters.getMessagesForUser(userId);
-      return messages.filter(
-        m => m.receiverId === state.currentUser?.id && !m.isRead
-      ).length;
+      return messages.filter(m => m.receiverId === state.currentUser?.id && !m.isRead).length;
     },
-    getGroupMessages: (state) => {
+
+    getGroupMessages: state => {
       return state.groupMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     },
-    getTotalUnreadCount: (state, getters) => {
-      if (!state.currentUser) return 0;
-      return state.messages.filter(
-        m => m.receiverId === state.currentUser.id && !m.isRead
-      ).length;
-    }
-  }
-});
 
-function addHours(time, hours) {
-  const [hour, minute] = time.split(':').map(Number);
-  const totalMinutes = hour * 60 + minute + hours * 60;
-  const newHour = Math.floor(totalMinutes / 60) % 24;
-  const newMinute = totalMinutes % 60;
-  return `${String(newHour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`;
-}
+    getTotalUnreadCount: state => {
+      return state.messages.filter(m => m.receiverId === state.currentUser?.id && !m.isRead).length;
+    },
+
+    getNotificationsForCurrentUser: state => {
+      if (!state.currentUser) return [];
+      return state.notifications
+        .filter(n => n.userId === state.currentUser.id)
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    },
+
+    getUnreadNotificationCount: (state, getters) => {
+      return getters.getNotificationsForCurrentUser.filter(n => !n.isRead).length;
+    },
+  },
+});
