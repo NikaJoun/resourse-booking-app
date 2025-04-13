@@ -8,7 +8,7 @@
 ### Клонируйте репозиторий
 
 ```
-git clone https://github.com/ваш-username/resourse-booking-app
+git clone https://github.com/nikajoun/resourse-booking-app
 ```
 
 ### Перейдите в директорию проекта
