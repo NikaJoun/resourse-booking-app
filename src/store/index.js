@@ -27,6 +27,9 @@ export default createStore({
     messages: JSON.parse(localStorage.getItem('messages')) || [],
     groupMessages: JSON.parse(localStorage.getItem('groupMessages')) || [],
     notifications: JSON.parse(localStorage.getItem('notifications')) || [],
+    calendarSettings: JSON.parse(localStorage.getItem('calendarSettings')) || {
+      lastExport: null
+    },
   },
 
   mutations: {
@@ -152,7 +155,19 @@ export default createStore({
       state.notifications = state.notifications.map(n => ({ ...n, isRead: true }));
       localStorage.setItem('notifications', JSON.stringify(state.notifications));
     },
+    UPDATE_LAST_EXPORT(state) {
+      state.calendarSettings.lastExport = new Date().toISOString();
+      localStorage.setItem('calendarSettings', JSON.stringify(state.calendarSettings));
+    },
+    ADD_NOTIFICATION(state, notification) {
+      notification.id = Date.now();
+      notification.timestamp = new Date().toISOString();
+      notification.isRead = false;
+      state.notifications.push(notification);
+      localStorage.setItem('notifications', JSON.stringify(state.notifications));
+    },
   },
+
   actions: {
     login({ commit }, user) {
       commit('SET_CURRENT_USER', user);
@@ -268,7 +283,6 @@ export default createStore({
   getters: {
     isAdmin: state => state.currentUser?.role === 'admin',
     isResourceManager: state => state.currentUser?.role === 'manager',
-
     isResourceBooked: state => (resourceId, date, time, duration) => {
       return state.bookings.some(booking => {
         if (booking.resourceId === resourceId && booking.date === date) {
@@ -285,30 +299,25 @@ export default createStore({
         return false;
       });
     },
-
     getResourceNameById: state => resourceId => {
       const resource = state.resources.find(r => r.id === resourceId);
       return resource ? resource.name : 'Неизвестный ресурс';
     },
-
     managedResources: state => {
       if (!state.currentUser || state.currentUser.role !== 'manager') return [];
       return state.resources.filter(
         r => r.type === state.currentUser.managedResourceType && r.managerId === state.currentUser.id
       );
     },
-
     pendingBookings: (state, getters) => {
       if (!state.currentUser || state.currentUser.role !== 'manager') return [];
       const managedResourceIds = getters.managedResources.map(r => r.id);
       return state.bookings.filter(b => managedResourceIds.includes(b.resourceId) && !b.isConfirmed);
     },
-
     getUserNameById: state => userId => {
       const user = state.users.find(u => u.id === userId);
       return user ? user.username : `Пользователь ${userId}`;
     },
-
     getMessagesForUser: state => userId => {
       const currentUserId = state.currentUser?.id;
       if (!currentUserId) return [];
@@ -320,39 +329,58 @@ export default createStore({
         )
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     },
-
     getOtherUsers: state => {
       const currentUserId = state.currentUser?.id;
       return currentUserId ? state.users.filter(u => u.id !== currentUserId) : [];
     },
-
     getLastMessageForUser: (state, getters) => userId => {
       const messages = getters.getMessagesForUser(userId);
       return messages.length > 0 ? messages[messages.length - 1] : null;
     },
-
     getUnreadCountForUser: (state, getters) => userId => {
       const messages = getters.getMessagesForUser(userId);
       return messages.filter(m => m.receiverId === state.currentUser?.id && !m.isRead).length;
     },
-
     getGroupMessages: state => {
       return state.groupMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     },
-
     getTotalUnreadCount: state => {
       return state.messages.filter(m => m.receiverId === state.currentUser?.id && !m.isRead).length;
     },
-
     getNotificationsForCurrentUser: state => {
       if (!state.currentUser) return [];
       return state.notifications
         .filter(n => n.userId === state.currentUser.id)
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     },
-
     getUnreadNotificationCount: (state, getters) => {
       return getters.getNotificationsForCurrentUser.filter(n => !n.isRead).length;
+    },
+    isBookingCompleted: (state) => (booking) => {
+      const bookingDate = new Date(`${booking.date}T${booking.time}`);
+      const now = new Date();
+      const endDate = new Date(bookingDate.getTime() + booking.duration * 60 * 60 * 1000);
+      return endDate < now;
+    },
+    userActiveBookings: (state, getters) => {
+      if (!state.currentUser) return [];
+      return state.bookings.filter(booking => {
+        return booking.userId === state.currentUser.id && 
+               !booking.isCancelled && 
+               !getters.isBookingCompleted(booking);
+      });
+    },
+    userBookingHistory: (state, getters) => {
+      if (!state.currentUser) return [];
+      return state.bookings.filter(booking => {
+        return booking.userId === state.currentUser.id && 
+               (booking.isCancelled || getters.isBookingCompleted(booking));
+      });
+    },
+    lastExportDate: (state) => {
+      return state.calendarSettings.lastExport 
+        ? new Date(state.calendarSettings.lastExport).toLocaleString() 
+        : 'никогда';
     },
   },
 });

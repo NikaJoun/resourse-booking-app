@@ -5,6 +5,9 @@
 
       <div v-if="store.state.currentUser" class="user-info">
         <h2>Добро пожаловать, {{ store.state.currentUser.username }}!</h2>
+        <button @click="showSyncModal = true" class="btn btn-primary sync-btn">
+          <i class="bi bi-calendar-plus"></i> Синхронизировать все бронирования
+        </button>
       </div>
 
       <ul class="nav nav-tabs mb-4">
@@ -41,7 +44,12 @@
                 {{ booking.isConfirmed ? 'Подтверждено' : 'Ожидает подтверждения' }}
               </span>
             </div>
-            <button @click="openCancelModal(booking.id)" class="btn btn-warning">Отменить</button>
+            <div class="booking-actions">
+              <button @click="openCancelModal(booking.id)" class="btn btn-warning">Отменить</button>
+              <button @click="exportSingleBooking(booking)" class="btn btn-outline-primary">
+                <i class="bi bi-calendar-plus"></i> Экспорт
+              </button>
+            </div>
           </li>
         </ul>
         <div v-if="activeBookings.length === 0" class="no-bookings-message">
@@ -62,6 +70,11 @@
                 {{ getStatusText(booking) }}
               </span>
             </div>
+            <div class="booking-actions">
+              <button @click="exportSingleBooking(booking)" class="btn btn-outline-primary">
+                <i class="bi bi-calendar-plus"></i> Экспорт
+              </button>
+            </div>
           </li>
         </ul>
         <div v-if="bookingHistory.length === 0" class="no-bookings-message">
@@ -80,24 +93,53 @@
         </div>
       </div>
     </div>
+
+    <CalendarExportModal 
+      v-if="showSyncModal"
+      :show="showSyncModal"
+      @close="showSyncModal = false"
+      @download="downloadICS"
+    />
   </div>
 </template>
 
 <script>
 import { computed, ref } from 'vue';
 import { useStore } from 'vuex';
+import CalendarExportModal from '@/components/CalendarExportModal.vue';
 
 export default {
+  components: {
+    CalendarExportModal
+  },
   setup() {
     const store = useStore();
 
     const activeTab = ref('active');
     const showCancelModal = ref(false);
+    const showSyncModal = ref(false);
     const selectedBookingId = ref(null);
 
-    const isBookingExpired = (booking) => {
-      const bookingDate = new Date(`${booking.date}T${booking.time}`);
-      return bookingDate < new Date();
+    const activeBookings = computed(() => store.getters.userActiveBookings);
+    const bookingHistory = computed(() => store.getters.userBookingHistory);
+    const lastExportDate = computed(() => store.getters.lastExportDate);
+
+    const getResourceName = (resourceId) => {
+      return store.getters.getResourceNameById(resourceId);
+    };
+
+    const getStatusClass = (booking) => {
+      if (booking.isCompleted) return 'text-success';
+      if (booking.isCancelled) return 'text-danger';
+      if (store.getters.isBookingCompleted(booking)) return 'text-secondary';
+      return 'text-warning';
+    };
+
+    const getStatusText = (booking) => {
+      if (booking.isCompleted) return 'Завершено';
+      if (booking.isCancelled) return 'Отменено';
+      if (store.getters.isBookingCompleted(booking)) return 'Истекло';
+      return booking.isConfirmed ? 'Подтверждено' : 'Ожидает подтверждения';
     };
 
     const openCancelModal = (bookingId) => {
@@ -112,47 +154,81 @@ export default {
 
     const confirmCancel = () => {
       if (selectedBookingId.value) {
-        store.commit('CANCEL_BOOKING', selectedBookingId.value);
+        store.dispatch('cancelBooking', selectedBookingId.value);
       }
       closeCancelModal();
     };
 
-    const activeBookings = computed(() => {
-      if (!store.state.currentUser) return [];
-      return store.state.bookings.filter(
-        (booking) =>
-          booking.userId === store.state.currentUser.id &&
-          !booking.isCancelled &&
-          !booking.isCompleted &&
-          !isBookingExpired(booking)
-      );
-    });
+    const generateICS = (bookings) => {
+      let icsContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Booking System//EN',
+        'CALSCALE:GREGORIAN'
+      ];
 
-    const bookingHistory = computed(() => {
-      if (!store.state.currentUser) return [];
-      return store.state.bookings.filter(
-        (booking) =>
-          booking.userId === store.state.currentUser.id &&
-          (booking.isCancelled || booking.isCompleted || isBookingExpired(booking))
-      );
-    });
+      const formatDate = (date) => {
+        return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      };
 
-    const getResourceName = (resourceId) => {
-      return store.getters.getResourceNameById(resourceId);
+      bookings.forEach(booking => {
+        const resourceName = getResourceName(booking.resourceId);
+        const startDate = new Date(`${booking.date}T${booking.time}`);
+        const endDate = new Date(startDate.getTime() + booking.duration * 60 * 60 * 1000);
+        
+        icsContent.push(
+          'BEGIN:VEVENT',
+          `UID:${booking.id}@booking-system`,
+          `DTSTAMP:${formatDate(new Date())}`,
+          `DTSTART:${formatDate(startDate)}`,
+          `DTEND:${formatDate(endDate)}`,
+          `SUMMARY:Бронирование ${resourceName}`,
+          `DESCRIPTION:Бронирование ресурса "${resourceName}" на ${booking.date} в ${booking.time}. Продолжительность: ${booking.duration} ч.`,
+          `STATUS:${booking.isConfirmed ? 'CONFIRMED' : 'TENTATIVE'}`,
+          'END:VEVENT'
+        );
+      });
+
+      icsContent.push('END:VCALENDAR');
+      return icsContent.join('\r\n');
     };
 
-    const getStatusClass = (booking) => {
-      if (booking.isCompleted) return 'text-success';
-      if (booking.isCancelled) return 'text-danger';
-      if (isBookingExpired(booking)) return 'text-secondary';
-      return 'text-warning';
+    const downloadICSFile = (icsContent, filename) => {
+      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     };
 
-    const getStatusText = (booking) => {
-      if (booking.isCompleted) return 'Завершено';
-      if (booking.isCancelled) return 'Отменено';
-      if (isBookingExpired(booking)) return 'Истекло';
-      return 'Ожидает подтверждения';
+    const downloadICS = () => {
+      const bookings = activeTab.value === 'active' ? activeBookings.value : bookingHistory.value;
+      const icsContent = generateICS(bookings);
+      downloadICSFile(icsContent, 'all-bookings.ics');
+      
+      store.dispatch('exportToCalendar');
+      
+      store.dispatch('addNotification', {
+        userId: store.state.currentUser.id,
+        text: 'Бронирования экспортированы в файл календаря',
+        type: 'calendar-export'
+      });
+    };
+
+    const exportSingleBooking = (booking) => {
+      const icsContent = generateICS([booking]);
+      downloadICSFile(icsContent, `booking-${booking.id}.ics`);
+      
+      store.dispatch('addNotification', {
+        userId: store.state.currentUser.id,
+        text: `Бронирование ${getResourceName(booking.resourceId)} экспортировано`,
+        type: 'calendar-export'
+      });
     };
 
     return {
@@ -160,13 +236,17 @@ export default {
       activeTab,
       activeBookings,
       bookingHistory,
+      lastExportDate,
       getResourceName,
       getStatusClass,
       getStatusText,
       showCancelModal,
+      showSyncModal,
       openCancelModal,
       closeCancelModal,
       confirmCancel,
+      downloadICS,
+      exportSingleBooking
     };
   },
 };
@@ -207,6 +287,19 @@ export default {
     font-weight: 600;
     color: #495057;
   }
+}
+
+.sync-btn {
+  margin-top: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sync-status {
+  margin-top: 0.5rem;
+  color: #6c757d;
+  font-size: 0.9rem;
 }
 
 .nav-tabs {
@@ -258,22 +351,59 @@ export default {
   }
 }
 
+.booking-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-left: 1rem;
+}
+
 .btn {
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 8px;
   font-size: 1rem;
   font-weight: 500;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 
   &:hover {
     opacity: 0.9;
   }
 }
 
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-outline-primary {
+  background-color: transparent;
+  border: 1px solid #007bff;
+  color: #007bff;
+
+  &:hover {
+    background-color: #007bff;
+    color: white;
+  }
+}
+
 .btn-warning {
   background-color: #ffc107;
   color: black;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
 }
 
 .text-success {
