@@ -1,5 +1,5 @@
 <template>
-  <div class="messenger-wrapper" v-if="isOpen">
+  <div class="messenger-wrapper" :class="{show: isOpen}">
     <div class="messenger-container">
       <div class="header">
         <h3>Мессенджер</h3>
@@ -91,7 +91,10 @@ import { useStore } from 'vuex';
 
 export default {
   props: {
-    isOpen: Boolean
+    isOpen: {
+      type: Boolean,
+      required: true
+    }
   },
   emits: ['close'],
   setup(props, { emit }) {
@@ -223,22 +226,29 @@ export default {
 <style scoped>
 .messenger-wrapper {
   position: fixed;
-  bottom: 20px;
+  bottom: 0;
   right: 20px;
-  width: 400px;
-  height: 500px;
-  z-index: 1000;
-  font-family: 'Segoe UI', sans-serif;
+  z-index: 1050;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  will-change: transform;
+  
+  &.show {
+    transform: translateY(0);
+  }
 }
 
 .messenger-container {
   background: linear-gradient(to bottom right, #ffffff, #f8f9fa);
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  height: 100%;
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.1);
+  width: 380px;
+  max-height: 70vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border: 1px solid #e9ecef;
+  border-bottom: none;
 }
 
 .header {
@@ -436,5 +446,22 @@ export default {
 
 .input-area button:hover {
   background: #0b5ed7;
+}
+
+@media (max-width: 480px) {
+  .messenger-wrapper {
+    right: 0;
+    left: 0;
+    width: 100%;
+  }
+  
+  .messenger-container {
+    width: 100%;
+    border-radius: 12px 12px 0 0;
+  }
+  
+  .user-list {
+    width: 120px;
+  }
 }
 </style>

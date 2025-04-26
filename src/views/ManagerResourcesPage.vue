@@ -1,97 +1,149 @@
 <template>
-  <div class="manager-resources-container">
-    <div class="manager-resources-card">
-      <h1 class="manager-resources-title">Управление ресурсами</h1>
+  <div class="admin-page">
+    <div class="admin-header">
+      <h1><i class="bi bi-gear"></i> Управление ресурсами</h1>
+    </div>
 
-      <ul class="nav nav-tabs mb-4">
-        <li class="nav-item">
-          <a
-            class="nav-link"
-            :class="{ active: activeTab === 'resources' }"
-            @click="activeTab = 'resources'"
+    <div class="admin-content">
+      <div class="admin-tabs">
+        <div class="tabs-header">
+          <button 
+            @click="activeTab = 'resources'" 
+            :class="['tab-btn', { active: activeTab === 'resources' }]"
           >
-            Мои ресурсы
-          </a>
-        </li>
-        <li class="nav-item">
-          <a
-            class="nav-link"
-            :class="{ active: activeTab === 'bookings' }"
-            @click="activeTab = 'bookings'"
+            <i class="bi bi-collection"></i> Мои ресурсы
+          </button>
+          <button 
+            @click="activeTab = 'bookings'" 
+            :class="['tab-btn', { active: activeTab === 'bookings' }]"
           >
-            Подтверждение бронирований
-          </a>
-        </li>
-        <li class="nav-item">
-          <a
-            class="nav-link"
-            :class="{ active: activeTab === 'allBookings' }"
-            @click="activeTab = 'allBookings'"
+            <i class="bi bi-clock-history"></i> Подтверждение бронирований
+          </button>
+          <button 
+            @click="activeTab = 'allBookings'" 
+            :class="['tab-btn', { active: activeTab === 'allBookings' }]"
           >
-            Все бронирования
-          </a>
-        </li>
-      </ul>
+            <i class="bi bi-calendar-check"></i> Все бронирования
+          </button>
+        </div>
 
-      <div v-if="activeTab === 'resources'" class="tab-content">
-        <ul class="resource-list">
-          <li v-for="resource in managedResources" :key="resource.id" class="resource-item">
-            <div class="resource-info">
-              <strong>Название:</strong> {{ resource.name }} <br />
-              <strong>Тип:</strong> {{ resource.type }}
+        <div class="tabs-content">
+          <div v-if="activeTab === 'resources'" class="tab-pane">
+            <div v-if="managedResources.length === 0" class="empty-state">
+              <i class="bi bi-collection"></i>
+              <p>У вас нет управляемых ресурсов</p>
             </div>
-          </li>
-        </ul>
-      </div>
 
-      <div v-if="activeTab === 'bookings'" class="tab-content">
-        <div v-if="pendingBookings.length > 0">
-          <ul class="booking-list">
-            <li v-for="booking in pendingBookings" :key="booking.id" class="booking-item">
-              <div class="booking-info">
-                <strong>Дата:</strong> {{ booking.date }} <br />
-                <strong>Время:</strong> {{ booking.time }} <br />
-                <strong>Ресурс:</strong> {{ getResourceName(booking.resourceId) }} <br />
-                <strong>Продолжительность:</strong> {{ booking.duration }} час(ов) <br />
-                <strong>Пользователь:</strong> {{ getUserName(booking.userId) }} <br />
-                <strong>Статус:</strong>
-                <span :class="booking.isConfirmed ? 'text-success' : 'text-warning'">
-                  {{ booking.isConfirmed ? 'Подтверждено' : 'Ожидает подтверждения' }}
-                </span>
+            <div v-else class="admin-cards">
+              <div v-for="resource in managedResources" :key="resource.id" class="admin-card">
+                <div class="card-header">
+                  <div class="resource-icon" :class="resource.type">
+                    <i :class="getResourceIcon(resource.type)"></i>
+                  </div>
+                  <div class="resource-title">
+                    <h3>{{ resource.name }}</h3>
+                    <span class="resource-type">
+                      {{ formatResourceType(resource.type) }}
+                    </span>
+                  </div>
+                </div>
+                
+                <div class="card-body">
+                  <div class="info-row">
+                    <i class="bi bi-info-circle"></i>
+                    <span>ID: {{ resource.id }}</span>
+                  </div>
+                </div>
               </div>
-              <button @click="confirmBooking(booking.id)" class="btn btn-success">Подтвердить</button>
-              <button @click="rejectBooking(booking.id)" class="btn btn-danger">Отклонить</button>
-            </li>
-          </ul>
-        </div>
-        <div v-else class="no-bookings-message">
-          <p>Нет новых бронирований, которые нужно подтвердить.</p>
-        </div>
-      </div>
+            </div>
+          </div>
 
-      <div v-if="activeTab === 'allBookings'" class="tab-content">
-        <div class="booking-filters mb-4">
-          <div class="filter-row">
-            <div class="filter-group">
-              <label for="resourceFilter">Ресурс:</label>
-              <select id="resourceFilter" v-model="selectedResourceFilter" class="form-control">
-                <option value="">Все ресурсы</option>
-                <option v-for="resource in managedResources" :key="resource.id" :value="resource.id">
-                  {{ resource.name }}
-                </option>
-              </select>
+          <div v-if="activeTab === 'bookings'" class="tab-pane">
+            <div v-if="pendingBookings.length === 0" class="empty-state">
+              <i class="bi bi-check-circle"></i>
+              <p>Нет новых бронирований для подтверждения</p>
             </div>
-            <div class="filter-group">
-              <label for="dateFrom">Дата с:</label>
-              <input id="dateFrom" v-model="dateFrom" type="date" class="form-control">
+
+            <div v-else class="admin-cards">
+              <div v-for="booking in pendingBookings" :key="booking.id" class="admin-card">
+                <div class="card-header">
+                  <div class="resource-icon">
+                    <i class="bi bi-calendar-plus"></i>
+                  </div>
+                  <div class="resource-title">
+                    <h3>Бронирование #{{ booking.id }}</h3>
+                    <span class="resource-type">
+                      {{ formatDate(booking.date) }} в {{ booking.time }}
+                    </span>
+                  </div>
+                </div>
+                
+                <div class="card-body">
+                  <div class="info-row">
+                    <i class="bi bi-collection"></i>
+                    <span>Ресурс: {{ getResourceName(booking.resourceId) }}</span>
+                  </div>
+                  <div class="info-row">
+                    <i class="bi bi-person"></i>
+                    <span>Пользователь: {{ getUserName(booking.userId) }}</span>
+                  </div>
+                  <div class="info-row">
+                    <i class="bi bi-clock"></i>
+                    <span>Продолжительность: {{ booking.duration }} час(ов)</span>
+                  </div>
+                </div>
+                
+                <div class="card-actions">
+                  <button 
+                    @click="confirmBooking(booking.id)" 
+                    class="btn btn-sm btn-success"
+                  >
+                    <i class="bi bi-check-lg"></i> Подтвердить
+                  </button>
+                  <button 
+                    @click="rejectBooking(booking.id)" 
+                    class="btn btn-sm btn-outline-danger"
+                  >
+                    <i class="bi bi-x-lg"></i> Отклонить
+                  </button>
+                </div>
+              </div>
             </div>
-            <div class="filter-group">
-              <label for="dateTo">Дата по:</label>
-              <input id="dateTo" v-model="dateTo" type="date" class="form-control">
-            </div>
-            <div class="filter-group">
-              <label for="statusFilter">Статус:</label>
-              <select id="statusFilter" v-model="selectedStatusFilter" class="form-control">
+          </div>
+
+          <div v-if="activeTab === 'allBookings'" class="tab-pane">
+            <div class="admin-filters">
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <select class="form-select" v-model="selectedResourceFilter">
+                  <option value="">Все ресурсы</option>
+                  <option v-for="resource in managedResources" :key="resource.id" :value="resource.id">
+                    {{ resource.name }}
+                  </option>
+                </select>
+              </div>
+              
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-calendar"></i></span>
+                <input 
+                  type="date" 
+                  class="form-control" 
+                  v-model="dateFrom"
+                  placeholder="Дата с"
+                >
+              </div>
+              
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-calendar"></i></span>
+                <input 
+                  type="date" 
+                  class="form-control" 
+                  v-model="dateTo"
+                  placeholder="Дата по"
+                >
+              </div>
+              
+              <select class="form-select" v-model="selectedStatusFilter">
                 <option value="">Все статусы</option>
                 <option value="pending">Ожидает подтверждения</option>
                 <option value="confirmed">Подтверждено</option>
@@ -99,28 +151,51 @@
                 <option value="cancelled">Отменено</option>
               </select>
             </div>
-          </div>
-        </div>
 
-        <div v-if="filteredAllBookings.length > 0">
-          <ul class="booking-list">
-            <li v-for="booking in filteredAllBookings" :key="booking.id" class="booking-item">
-              <div class="booking-info">
-                <strong>Дата:</strong> {{ formatDate(booking.date) }} <br />
-                <strong>Время:</strong> {{ booking.time }} <br />
-                <strong>Ресурс:</strong> {{ getResourceName(booking.resourceId) }} <br />
-                <strong>Продолжительность:</strong> {{ booking.duration }} час(ов) <br />
-                <strong>Пользователь:</strong> {{ getUserName(booking.userId) }} <br />
-                <strong>Статус:</strong>
-                <span :class="getStatusClass(booking)">
-                  {{ getStatusText(booking) }}
-                </span>
+            <div v-if="filteredAllBookings.length === 0" class="empty-state">
+              <i class="bi bi-calendar-x"></i>
+              <p>Бронирования не найдены</p>
+            </div>
+
+            <div v-else class="admin-cards">
+              <div v-for="booking in filteredAllBookings" :key="booking.id" class="admin-card">
+                <div class="card-header">
+                  <div class="resource-icon" :class="getBookingStatusClass(booking)">
+                    <i :class="getBookingIcon(booking)"></i>
+                  </div>
+                  <div class="resource-title">
+                    <h3>Бронирование #{{ booking.id }}</h3>
+                    <span class="resource-type">
+                      {{ formatDate(booking.date) }} в {{ booking.time }}
+                    </span>
+                  </div>
+                </div>
+                
+                <div class="card-body">
+                  <div class="info-row">
+                    <i class="bi bi-collection"></i>
+                    <span>Ресурс: {{ getResourceName(booking.resourceId) }}</span>
+                  </div>
+                  <div class="info-row">
+                    <i class="bi bi-person"></i>
+                    <span>Пользователь: {{ getUserName(booking.userId) }}</span>
+                  </div>
+                  <div class="info-row">
+                    <i class="bi bi-clock"></i>
+                    <span>Продолжительность: {{ booking.duration }} час(ов)</span>
+                  </div>
+                  <div class="info-row">
+                    <i class="bi bi-info-circle"></i>
+                    <span>Статус: 
+                      <span :class="getStatusTextClass(booking)">
+                        {{ getStatusText(booking) }}
+                      </span>
+                    </span>
+                  </div>
+                </div>
               </div>
-            </li>
-          </ul>
-        </div>
-        <div v-else class="no-bookings-message">
-          <p>Нет бронирований, соответствующих выбранным фильтрам.</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -135,7 +210,7 @@ import { useToast } from 'vue-toastification';
 export default {
   setup() {
     const store = useStore();
-    const toast = useToast(); 
+    const toast = useToast();
     const activeTab = ref('resources');
 
     const selectedResourceFilter = ref('');
@@ -162,7 +237,7 @@ export default {
     
     const getUserName = (userId) => {
       const user = store.state.users.find(u => u.id === userId);
-      return user ? user.name : 'Неизвестный пользователь';
+      return user ? user.username : 'Неизвестный пользователь';
     };
 
     const filteredAllBookings = computed(() => {
@@ -198,7 +273,26 @@ export default {
     });
 
     const getResourceName = (resourceId) => {
-      return store.getters.getResourceNameById(resourceId);
+      const resource = store.state.resources.find(r => r.id === resourceId);
+      return resource ? resource.name : 'Неизвестный ресурс';
+    };
+
+    const getResourceIcon = (type) => {
+      switch(type) {
+        case 'photographer': return 'bi bi-camera';
+        case 'conference_room': return 'bi bi-building';
+        case 'equipment': return 'bi bi-pc-display';
+        default: return 'bi bi-collection';
+      }
+    };
+
+    const formatResourceType = (type) => {
+      switch(type) {
+        case 'photographer': return 'Фотограф';
+        case 'conference_room': return 'Конференц-зал';
+        case 'equipment': return 'Оборудование';
+        default: return type;
+      }
     };
 
     const confirmBooking = async (bookingId) => {
@@ -221,10 +315,22 @@ export default {
       }
     };
 
-    const getStatusClass = (booking) => {
+    const getStatusTextClass = (booking) => {
       if (booking.isCompleted) return 'text-success';
       if (booking.isCancelled) return 'text-danger';
       return booking.isConfirmed ? 'text-success' : 'text-warning';
+    };
+
+    const getBookingStatusClass = (booking) => {
+      if (booking.isCompleted) return 'completed';
+      if (booking.isCancelled) return 'cancelled';
+      return booking.isConfirmed ? 'confirmed' : 'pending';
+    };
+
+    const getBookingIcon = (booking) => {
+      if (booking.isCompleted) return 'bi bi-check-circle';
+      if (booking.isCancelled) return 'bi bi-x-circle';
+      return booking.isConfirmed ? 'bi bi-check-circle' : 'bi bi-clock';
     };
 
     const getStatusText = (booking) => {
@@ -249,9 +355,13 @@ export default {
       dateTo,
       selectedStatusFilter,
       getResourceName,
+      getResourceIcon,
+      formatResourceType,
       confirmBooking,
       rejectBooking,
-      getStatusClass,
+      getStatusTextClass,
+      getBookingStatusClass,
+      getBookingIcon,
       getStatusText,
       formatDate,
       getUserName,
@@ -261,173 +371,328 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.manager-resources-container {
+.admin-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.admin-header {
+  margin-bottom: 2rem;
+  
+  h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #212529;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    
+    i {
+      color: #0d6efd;
+    }
+  }
+}
+
+.admin-tabs {
+  background: #fff;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.tabs-header {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  padding: 1rem;
-}
-
-.manager-resources-card {
-  background: #ffffff;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  max-width: 1000px;
-  width: 100%;
-}
-
-.manager-resources-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #343a40;
-  text-align: center;
-  margin-bottom: 1.5rem;
-}
-
-.nav-tabs {
-  border-bottom: 2px solid #dee2e6;
-
-  .nav-link {
-    padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid #dee2e6;
+  
+  .tab-btn {
+    flex: 1;
+    padding: 1rem;
+    background: none;
     border: none;
-    border-radius: 8px 8px 0 0;
     font-size: 1rem;
     font-weight: 500;
-    color: #495057;
-    transition: all 0.3s ease;
+    color: #6c757d;
     cursor: pointer;
-
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    
+    i {
+      font-size: 1.1rem;
+    }
+    
     &:hover {
       background-color: #f8f9fa;
+      color: #0d6efd;
     }
-
+    
     &.active {
-      color: #007bff;
-      border-bottom: 2px solid #007bff;
-      background-color: transparent;
+      color: #0d6efd;
+      border-bottom: 2px solid #0d6efd;
+      background-color: rgba(13, 110, 253, 0.05);
     }
   }
 }
 
-.booking-filters {
-  background-color: #f8f9fa;
-  padding: 1rem;
-  border-radius: 8px;
+.tabs-content {
+  padding: 1.5rem;
+}
+
+.admin-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
   margin-bottom: 1.5rem;
   
-  .filter-row {
+  .input-group {
     display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
+    align-items: center;
+    
+    .input-group-text {
+      padding: 0.5rem 0.75rem;
+      background-color: #f8f9fa;
+      border: 1px solid #ced4da;
+      border-right: none;
+      border-radius: 0.25rem 0 0 0.25rem;
+    }
+    
+    .form-control, .form-select {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #ced4da;
+      border-radius: 0 0.25rem 0.25rem 0;
+    }
+  }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6c757d;
+  
+  i {
+    font-size: 3rem;
+    color: #adb5bd;
+    margin-bottom: 1rem;
   }
   
-  .filter-group {
-    flex: 1;
-    min-width: 200px;
-    
-    label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-weight: 500;
-      color: #495057;
-    }
-    
-    .form-control {
-      width: 100%;
-      padding: 0.5rem 1rem;
-      border: 1px solid #ced4da;
-      border-radius: 4px;
-      font-size: 1rem;
-    }
+  p {
+    font-size: 1.1rem;
+    margin: 0;
   }
 }
 
-.resource-list,
-.booking-list {
-  list-style: none;
-  padding: 0;
+.admin-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
 }
 
-.resource-item,
-.booking-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  border: 1px solid #ced4da;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-  background-color: #f8f9fa;
-}
-
-.resource-info,
-.booking-info {
-  flex: 1;
-
-  strong {
-    color: #343a40;
-  }
-}
-
-.btn {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 500;
-  transition: background-color 0.3s ease;
-  margin-left: 0.5rem;
-
+.admin-card {
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+  
   &:hover {
-    opacity: 0.9;
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
   }
 }
 
-.btn-danger {
-  background-color: #dc3545;
-  color: white;
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  
+  .resource-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: #6c757d;
+    
+    &.photographer {
+      background: rgba(13, 110, 253, 0.1);
+      color: #0d6efd;
+    }
+    
+    &.conference_room {
+      background: rgba(25, 135, 84, 0.1);
+      color: #198754;
+    }
+    
+    &.equipment {
+      background: rgba(108, 117, 125, 0.1);
+      color: #6c757d;
+    }
+    
+    &.pending {
+      background: rgba(255, 193, 7, 0.1);
+      color: #ffc107;
+    }
+    
+    &.confirmed {
+      background: rgba(40, 167, 69, 0.1);
+      color: #28a745;
+    }
+    
+    &.completed {
+      background: rgba(13, 110, 253, 0.1);
+      color: #0d6efd;
+    }
+    
+    &.cancelled {
+      background: rgba(220, 53, 69, 0.1);
+      color: #dc3545;
+    }
+  }
+  
+  .resource-title {
+    flex: 1;
+    
+    h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0;
+      color: #212529;
+    }
+    
+    .resource-type {
+      font-size: 0.8rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      display: inline-block;
+      background: #f8f9fa;
+      color: #6c757d;
+    }
+  }
+}
+
+.card-body {
+  margin-bottom: 1rem;
+  
+  .info-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+    
+    i {
+      font-size: 0.9rem;
+    }
+  }
+}
+
+.card-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  border-top: 1px solid #f1f1f1;
+  padding-top: 1rem;
+  
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    padding: 0.35rem 0.75rem;
+    
+    i {
+      font-size: 0.9rem;
+    }
+  }
+}
+
+.text-success {
+  color: #28a745;
+}
+
+.text-warning {
+  color: #ffc107;
+}
+
+.text-danger {
+  color: #dc3545;
 }
 
 .btn-success {
   background-color: #28a745;
+  border-color: #28a745;
   color: white;
+  
+  &:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+  }
 }
 
-.text-success {
-  color: green;
+.btn-outline-danger {
+  color: #dc3545;
+  border-color: #dc3545;
+  
+  &:hover {
+    background-color: #dc3545;
+    color: white;
+  }
 }
 
-.text-warning {
-  color: orange;
-}
-
-.text-danger {
-  color: red;
-}
-
-.no-bookings-message {
-  text-align: center;
-  padding: 2rem;
-  color: #6c757d;
-  font-size: 1.1rem;
+@media (max-width: 992px) {
+  .admin-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .admin-cards {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 768px) {
-  .booking-item {
-    flex-direction: column;
-    align-items: flex-start;
-    
-    .btn {
-      margin-left: 0;
-      margin-top: 0.5rem;
-      width: 100%;
-    }
+  .admin-page {
+    padding: 1.5rem 1rem;
   }
   
-  .filter-group {
-    min-width: 100% !important;
+  .tabs-header .tab-btn {
+    font-size: 0.9rem;
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .admin-filters {
+    grid-template-columns: 1fr;
+  }
+  
+  .admin-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 576px) {
+  .admin-header h1 {
+    font-size: 1.75rem;
+  }
+  
+  .tabs-header {
+    flex-direction: column;
+    
+    .tab-btn {
+      padding: 0.75rem;
+      justify-content: flex-start;
+      border-bottom: 1px solid #dee2e6;
+      
+      &.active {
+        border-bottom: 2px solid #0d6efd;
+      }
+    }
   }
 }
 </style>

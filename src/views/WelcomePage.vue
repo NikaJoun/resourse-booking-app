@@ -1,30 +1,40 @@
 <template>
-  <div class="auth-container">
-    <div class="auth-card">
-      <h1 class="auth-title">Добро пожаловать!</h1>
-      <form @submit.prevent="login" class="auth-form">
-        <div class="form-group mb-3">
-          <label for="username" class="form-label">Логин</label>
-          <input
-            type="text"
-            class="form-control"
-            id="username"
-            v-model="username"
-            placeholder="Введите логин"
-          />
+  <div class="auth-wrapper">
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="auth-header">
+          <h1>Добро пожаловать</h1>
+          <p>Пожалуйста, войдите в свой аккаунт</p>
         </div>
-        <div class="form-group mb-4">
-          <label for="password" class="form-label">Пароль</label>
-          <input
-            type="password"
-            class="form-control"
-            id="password"
-            v-model="password"
-            placeholder="Введите пароль"
-          />
-        </div>
-        <button type="submit" class="btn btn-primary w-100">Войти</button>
-      </form>
+        
+        <form @submit.prevent="login" class="auth-form">
+          <div class="form-group">
+            <input
+              type="text"
+              class="form-input"
+              v-model="username"
+              placeholder=" "
+              required
+            />
+            <label>Логин</label>
+          </div>
+          
+          <div class="form-group">
+            <input
+              type="password"
+              class="form-input"
+              v-model="password"
+              placeholder=" "
+              required
+            />
+            <label>Пароль</label>
+          </div>
+          
+          <button type="submit" class="auth-button">
+            Войти
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 </template>
@@ -64,72 +74,124 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.auth-container {
+.auth-wrapper {
   display: flex;
   justify-content: center;
   align-items: center;
-  max-height: 100vh;
-  margin-top: 10vh;
-  padding: 1rem;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.auth-container {
+  width: 100%;
+  max-width: 400px;
 }
 
 .auth-card {
-  background: #ffffff;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  max-width: 400px;
-  width: 100%;
+  background: white;
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.08);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  }
 }
 
-.auth-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #343a40;
+.auth-header {
   text-align: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 32px;
+  
+  h1 {
+    font-size: 24px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+  
+  p {
+    font-size: 14px;
+    color: #777;
+    margin: 0;
+  }
 }
 
 .auth-form {
   .form-group {
-    margin-bottom: 1.5rem;
-
-    .form-label {
-      font-size: 1rem;
-      font-weight: 500;
-      color: #495057;
-      margin-bottom: 0.5rem;
-    }
-
-    .form-control {
+    position: relative;
+    margin-bottom: 24px;
+    
+    .form-input {
       width: 100%;
-      padding: 0.75rem;
-      border: 1px solid #ced4da;
+      padding: 14px 16px;
+      font-size: 16px;
+      border: 1px solid #e0e0e0;
       border-radius: 8px;
-      font-size: 1rem;
-      color: #495057;
-      transition: border-color 0.3s ease;
-
+      background: #fafafa;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      
       &:focus {
-        border-color: #80bdff;
+        border-color: #a0a0a0;
+        background: white;
         outline: none;
-        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        box-shadow: 0 0 0 2px rgba(107, 114, 128, 0.1);
+      }
+      
+      &:not(:placeholder-shown) + label,
+      &:focus + label {
+        transform: translateY(-24px) scale(0.9);
+        background: white;
+        padding: 0 4px;
+        left: 12px;
+        color: #555;
       }
     }
-  }
-
-  .btn-primary {
-    background-color: #007bff;
-    border: none;
-    padding: 0.75rem;
-    font-size: 1rem;
-    font-weight: 500;
-    border-radius: 8px;
-    transition: background-color 0.3s ease;
-
-    &:hover {
-      background-color: #0056b3;
+    
+    label {
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      color: #999;
+      font-size: 16px;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
+  }
+}
+
+.auth-button {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #6b73ff 0%, #000dff 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(107, 115, 255, 0.2);
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(107, 115, 255, 0.3);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 30px 20px;
+  }
+  
+  .auth-header h1 {
+    font-size: 20px;
   }
 }
 </style>

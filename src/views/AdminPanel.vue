@@ -1,150 +1,325 @@
 <template>
-  <div class="admin-container">
-    <div class="admin-card">
-      <h1 class="admin-title">Админ-панель</h1>
-      <div v-if="isAdmin">
-        <ul class="nav nav-tabs mb-4">
-          <li class="nav-item">
-            <a
-              class="nav-link"
-              :class="{ active: activeTab === 'users' }"
-              @click="activeTab = 'users'"
-            >
-              Пользователи
-            </a>
-          </li>
-          <li class="nav-item">
-            <a
-              class="nav-link"
-              :class="{ active: activeTab === 'resources' }"
-              @click="activeTab = 'resources'"
-            >
-              Ресурсы
-            </a>
-          </li>
-        </ul>
-
-        <div v-if="activeTab === 'users'" class="tab-content">
-          <div class="mb-4">
-            <input
-              type="text"
-              class="form-control mb-2"
-              placeholder="Поиск по имени"
-              v-model="userSearchQuery"
-            />
-            <select class="form-select" v-model="userRoleFilter">
-              <option value="">Все роли</option>
-              <option value="user">Пользователь</option>
-              <option value="manager">Менеджер</option>
-              <option value="admin">Администратор</option>
-            </select>
-          </div>
-
-          <button
-            type="button"
-            class="btn btn-success mb-4"
-            data-bs-toggle="modal"
-            data-bs-target="#userModal"
-            @click="openUserModal(null)"
-          >
-            Добавить пользователя
-          </button>
-
-          <ul class="user-list">
-            <li v-for="user in filteredUsers" :key="user.id" class="user-item">
-              <div class="user-info">
-                <strong>Имя:</strong> {{ user.username }} <br />
-                <strong>Роль:</strong> {{ user.role }} <br />
-                <strong>Тип ресурса:</strong>
-                {{ user.managedResourceType || 'Не назначено' }}
-              </div>
-              <div class="user-actions">
-                <button
-                  type="button"
-                  class="btn btn-primary me-2"
-                  data-bs-toggle="modal"
-                  data-bs-target="#userModal"
-                  @click="openUserModal(user)"
-                >
-                  Редактировать
-                </button>
-                <button @click="deleteUser(user.id)" class="btn btn-danger">Удалить</button>
-              </div>
-            </li>
-          </ul>
-        </div>
-
-        <div v-if="activeTab === 'resources'" class="tab-content">
-          <div class="mb-4">
-            <input
-              type="text"
-              class="form-control mb-2"
-              placeholder="Поиск по названию"
-              v-model="resourceSearchQuery"
-            />
-            <select class="form-select mb-2" v-model="resourceTypeFilter">
-              <option value="">Все типы</option>
-              <option value="photographer">Фотограф</option>
-              <option value="conference_room">Конференц-зал</option>
-              <option value="equipment">Оборудование</option>
-            </select>
-            <select class="form-select" v-model="resourceManagerFilter">
-              <option value="">Все менеджеры</option>
-              <option v-for="manager in managers" :key="manager.id" :value="manager.id">
-                {{ manager.username }}
-              </option>
-            </select>
-          </div>
-
-          <button
-            type="button"
-            class="btn btn-success mb-4"
-            data-bs-toggle="modal"
-            data-bs-target="#resourceModal"
-            @click="openResourceModal(null)"
-          >
-            Добавить ресурс
-          </button>
-
-          <ul class="resource-list">
-            <li v-for="resource in filteredResources" :key="resource.id" class="resource-item">
-              <div class="resource-info">
-                <strong>Название:</strong> {{ resource.name }} <br />
-                <strong>Тип:</strong> {{ resource.type }} <br />
-                <strong>Ответственный:</strong>
-                {{ getManagerName(resource.managerId) || 'Не назначено' }}
-              </div>
-              <div class="resource-actions">
-                <button
-                  type="button"
-                  class="btn btn-primary me-2"
-                  data-bs-toggle="modal"
-                  data-bs-target="#resourceModal"
-                  @click="openResourceModal(resource)"
-                >
-                  Редактировать
-                </button>
-                <button @click="deleteResource(resource.id)" class="btn btn-danger">Удалить</button>
-              </div>
-            </li>
-          </ul>
-        </div>
-
-        <UserModal
-          :user="currentUser"
-          :is-editing="isEditingUser"
-          @save-user="saveUser"
-        />
-
-        <ResourceModal
-          :resource="currentResource"
-          :is-editing="isEditingResource"
-          :managers="managers"
-          @save-resource="saveResource"
-        />
+  <div class="admin-page">
+    <div class="admin-header">
+      <h1><i class="bi bi-shield-lock"></i> Административная панель</h1>
+      <div v-if="!isAdmin" class="alert alert-danger">
+        <i class="bi bi-exclamation-octagon"></i> У вас нет доступа к этой странице
       </div>
-      <div v-else>
-        <p>У вас нет доступа к этой странице.</p>
+    </div>
+
+    <div v-if="isAdmin" class="admin-content">
+      <div class="admin-tabs">
+        <div class="tabs-header">
+          <button 
+            @click="activeTab = 'users'" 
+            :class="['tab-btn', { active: activeTab === 'users' }]"
+          >
+            <i class="bi bi-people"></i> Пользователи
+          </button>
+          <button 
+            @click="activeTab = 'resources'" 
+            :class="['tab-btn', { active: activeTab === 'resources' }]"
+          >
+            <i class="bi bi-collection"></i> Ресурсы
+          </button>
+        </div>
+
+        <div class="tabs-content">
+          <!-- Вкладка пользователей -->
+          <div v-if="activeTab === 'users'" class="tab-pane">
+            <div class="admin-filters">
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input
+                  type="text"
+                  class="form-control"
+                  placeholder="Поиск по имени"
+                  v-model="userSearchQuery"
+                >
+              </div>
+              
+              <select class="form-select" v-model="userRoleFilter">
+                <option value="">Все роли</option>
+                <option value="user">Пользователь</option>
+                <option value="manager">Менеджер</option>
+                <option value="admin">Администратор</option>
+              </select>
+              
+              <button 
+                @click="openUserModal(null)" 
+                class="btn btn-primary"
+              >
+                <i class="bi bi-plus-lg"></i> Добавить пользователя
+              </button>
+            </div>
+
+            <div v-if="filteredUsers.length === 0" class="empty-state">
+              <i class="bi bi-people-slash"></i>
+              <p>Пользователи не найдены</p>
+            </div>
+
+            <div v-else class="admin-cards">
+              <div v-for="user in filteredUsers" :key="user.id" class="admin-card">
+                <div class="card-header">
+                  <div class="user-avatar">
+                    <i class="bi bi-person-circle"></i>
+                  </div>
+                  <div class="user-title">
+                    <h3>{{ user.username }}</h3>
+                    <span :class="['user-role', user.role]">
+                      {{ formatRole(user.role) }}
+                    </span>
+                  </div>
+                </div>
+                
+                <div class="card-body">
+                  <div class="info-row">
+                    <i class="bi bi-tag"></i>
+                    <span>Тип ресурса: {{ user.managedResourceType || 'Не назначено' }}</span>
+                  </div>
+                </div>
+                
+                <div class="card-actions">
+                  <button 
+                    @click="openUserModal(user)" 
+                    class="btn btn-sm btn-outline-primary"
+                  >
+                    <i class="bi bi-pencil"></i> Редактировать
+                  </button>
+                  <button 
+                    @click="deleteUser(user.id)" 
+                    class="btn btn-sm btn-outline-danger"
+                  >
+                    <i class="bi bi-trash"></i> Удалить
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Вкладка ресурсов -->
+          <div v-if="activeTab === 'resources'" class="tab-pane">
+            <div class="admin-filters">
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input
+                  type="text"
+                  class="form-control"
+                  placeholder="Поиск по названию"
+                  v-model="resourceSearchQuery"
+                >
+              </div>
+              
+              <select class="form-select" v-model="resourceTypeFilter">
+                <option value="">Все типы</option>
+                <option value="photographer">Фотограф</option>
+                <option value="conference_room">Конференц-зал</option>
+                <option value="equipment">Оборудование</option>
+              </select>
+              
+              <select class="form-select" v-model="resourceManagerFilter">
+                <option value="">Все менеджеры</option>
+                <option v-for="manager in managers" :key="manager.id" :value="manager.id">
+                  {{ manager.username }}
+                </option>
+              </select>
+              
+              <button 
+                @click="openResourceModal(null)" 
+                class="btn btn-primary"
+              >
+                <i class="bi bi-plus-lg"></i> Добавить ресурс
+              </button>
+            </div>
+
+            <div v-if="filteredResources.length === 0" class="empty-state">
+              <i class="bi bi-collection"></i>
+              <p>Ресурсы не найдены</p>
+            </div>
+
+            <div v-else class="admin-cards">
+              <div v-for="resource in filteredResources" :key="resource.id" class="admin-card">
+                <div class="card-header">
+                  <div class="resource-icon" :class="resource.type">
+                    <i :class="getResourceIcon(resource.type)"></i>
+                  </div>
+                  <div class="resource-title">
+                    <h3>{{ resource.name }}</h3>
+                    <span class="resource-type">
+                      {{ formatResourceType(resource.type) }}
+                    </span>
+                  </div>
+                </div>
+                
+                <div class="card-body">
+                  <div class="info-row">
+                    <i class="bi bi-person-gear"></i>
+                    <span>Ответственный: {{ getManagerName(resource.managerId) || 'Не назначено' }}</span>
+                  </div>
+                </div>
+                
+                <div class="card-actions">
+                  <button 
+                    @click="openResourceModal(resource)" 
+                    class="btn btn-sm btn-outline-primary"
+                  >
+                    <i class="bi bi-pencil"></i> Редактировать
+                  </button>
+                  <button 
+                    @click="deleteResource(resource.id)" 
+                    class="btn btn-sm btn-outline-danger"
+                  >
+                    <i class="bi bi-trash"></i> Удалить
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно пользователя -->
+    <div v-if="showUserModal" class="modal-overlay">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>
+              <i class="bi bi-person"></i> 
+              {{ isEditingUser ? 'Редактировать пользователя' : 'Добавить пользователя' }}
+            </h3>
+            <button @click="closeUserModal" class="btn-close"></button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="saveUser">
+              <div class="mb-3">
+                <label class="form-label">Имя пользователя</label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  v-model="currentUser.username"
+                  required
+                >
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label">Пароль</label>
+                <input 
+                  type="password" 
+                  class="form-control" 
+                  v-model="currentUser.password"
+                  :required="!isEditingUser"
+                >
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label">Роль</label>
+                <select class="form-select" v-model="currentUser.role">
+                  <option value="user">Пользователь</option>
+                  <option value="manager">Менеджер</option>
+                  <option value="admin">Администратор</option>
+                </select>
+              </div>
+              
+              <div class="mb-3" v-if="currentUser.role === 'manager'">
+                <label class="form-label">Тип управляемого ресурса</label>
+                <select class="form-select" v-model="currentUser.managedResourceType">
+                  <option value="">Не назначено</option>
+                  <option value="photographer">Фотограф</option>
+                  <option value="conference_room">Конференц-зал</option>
+                  <option value="equipment">Оборудование</option>
+                </select>
+              </div>
+              
+              <div class="modal-footer">
+                <button type="button" @click="closeUserModal" class="btn btn-secondary">
+                  Отмена
+                </button>
+                <button type="submit" class="btn btn-primary">
+                  Сохранить
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно ресурса -->
+    <div v-if="showResourceModal" class="modal-overlay">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>
+              <i class="bi bi-collection"></i> 
+              {{ isEditingResource ? 'Редактировать ресурс' : 'Добавить ресурс' }}
+            </h3>
+            <button @click="closeResourceModal" class="btn-close"></button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="saveResource">
+              <div class="mb-3">
+                <label class="form-label">Название</label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  v-model="currentResource.name"
+                  required
+                >
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label">Тип</label>
+                <select class="form-select" v-model="currentResource.type">
+                  <option value="photographer">Фотограф</option>
+                  <option value="conference_room">Конференц-зал</option>
+                  <option value="equipment">Оборудование</option>
+                </select>
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label">Ответственный менеджер</label>
+                <select class="form-select" v-model="currentResource.managerId">
+                  <option value="">Не назначено</option>
+                  <option v-for="manager in managers" :key="manager.id" :value="manager.id">
+                    {{ manager.username }}
+                  </option>
+                </select>
+              </div>
+              
+              <div class="modal-footer">
+                <button type="button" @click="closeResourceModal" class="btn btn-secondary">
+                  Отмена
+                </button>
+                <button type="submit" class="btn btn-primary">
+                  Сохранить
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно подтверждения -->
+    <div v-if="showConfirmModal" class="modal-overlay">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3><i class="bi bi-exclamation-triangle"></i> Подтверждение</h3>
+          </div>
+          <div class="modal-body">
+            <p>{{ confirmMessage }}</p>
+          </div>
+          <div class="modal-footer">
+            <button @click="cancelAction" class="btn btn-secondary">
+              <i class="bi bi-x-lg"></i> Отмена
+            </button>
+            <button @click="confirmAction" class="btn btn-danger">
+              <i class="bi bi-check-lg"></i> Подтвердить
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -153,14 +328,8 @@
 <script>
 import { computed, ref } from 'vue';
 import { useStore } from 'vuex';
-import UserModal from '@/components/UserModal.vue';
-import ResourceModal from '@/components/ResourceModal.vue';
 
 export default {
-  components: {
-    UserModal,
-    ResourceModal,
-  },
   setup() {
     const store = useStore();
 
@@ -171,6 +340,12 @@ export default {
     const activeTab = ref('users');
     const isEditingUser = ref(false);
     const isEditingResource = ref(false);
+    const showUserModal = ref(false);
+    const showResourceModal = ref(false);
+    const showConfirmModal = ref(false);
+    const confirmMessage = ref('');
+    const actionToConfirm = ref(null);
+    const actionParams = ref(null);
 
     const currentUser = ref({
       id: null,
@@ -200,6 +375,33 @@ export default {
     const getManagerName = (managerId) => {
       const manager = store.state.users.find((user) => user.id === managerId);
       return manager ? manager.username : null;
+    };
+
+    const getResourceIcon = (type) => {
+      switch(type) {
+        case 'photographer': return 'bi bi-camera';
+        case 'conference_room': return 'bi bi-building';
+        case 'equipment': return 'bi bi-pc-display';
+        default: return 'bi bi-collection';
+      }
+    };
+
+    const formatRole = (role) => {
+      switch(role) {
+        case 'user': return 'Пользователь';
+        case 'manager': return 'Менеджер';
+        case 'admin': return 'Администратор';
+        default: return role;
+      }
+    };
+
+    const formatResourceType = (type) => {
+      switch(type) {
+        case 'photographer': return 'Фотограф';
+        case 'conference_room': return 'Конференц-зал';
+        case 'equipment': return 'Оборудование';
+        default: return type;
+      }
     };
 
     const filteredUsers = computed(() => {
@@ -233,20 +435,11 @@ export default {
         };
         isEditingUser.value = false;
       }
+      showUserModal.value = true;
     };
 
-    const deleteUser = (userId) => {
-      if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
-        store.commit('REMOVE_USER', userId);
-      }
-    };
-
-    const saveUser = (user) => {
-      if (isEditingUser.value) {
-        store.commit('UPDATE_USER', user);
-      } else {
-        store.commit('ADD_USER', user);
-      }
+    const closeUserModal = () => {
+      showUserModal.value = false;
     };
 
     const openResourceModal = (resource) => {
@@ -262,20 +455,63 @@ export default {
         };
         isEditingResource.value = false;
       }
+      showResourceModal.value = true;
+    };
+
+    const closeResourceModal = () => {
+      showResourceModal.value = false;
+    };
+
+    const showConfirmation = (message, action, params) => {
+      confirmMessage.value = message;
+      actionToConfirm.value = action;
+      actionParams.value = params;
+      showConfirmModal.value = true;
+    };
+
+    const confirmAction = () => {
+      if (actionToConfirm.value) {
+        actionToConfirm.value(actionParams.value);
+      }
+      showConfirmModal.value = false;
+    };
+
+    const cancelAction = () => {
+      showConfirmModal.value = false;
+    };
+
+    const deleteUser = (userId) => {
+      showConfirmation(
+        'Вы уверены, что хотите удалить этого пользователя?',
+        (id) => store.commit('REMOVE_USER', id),
+        userId
+      );
     };
 
     const deleteResource = (resourceId) => {
-      if (confirm('Вы уверены, что хотите удалить этот ресурс?')) {
-        store.commit('REMOVE_RESOURCE', resourceId);
-      }
+      showConfirmation(
+        'Вы уверены, что хотите удалить этот ресурс?',
+        (id) => store.commit('REMOVE_RESOURCE', id),
+        resourceId
+      );
     };
 
-    const saveResource = (resource) => {
-      if (isEditingResource.value) {
-        store.commit('UPDATE_RESOURCE', resource);
+    const saveUser = () => {
+      if (isEditingUser.value) {
+        store.commit('UPDATE_USER', currentUser.value);
       } else {
-        store.commit('ADD_RESOURCE', resource);
+        store.commit('ADD_USER', currentUser.value);
       }
+      closeUserModal();
+    };
+
+    const saveResource = () => {
+      if (isEditingResource.value) {
+        store.commit('UPDATE_RESOURCE', currentResource.value);
+      } else {
+        store.commit('ADD_RESOURCE', currentResource.value);
+      }
+      closeResourceModal();
     };
 
     return {
@@ -285,16 +521,11 @@ export default {
       activeTab,
       isEditingUser,
       isEditingResource,
+      showUserModal,
+      showResourceModal,
       currentUser,
       currentResource,
       managers,
-      getManagerName,
-      openUserModal,
-      deleteUser,
-      saveUser,
-      openResourceModal,
-      deleteResource,
-      saveResource,
       userSearchQuery,
       userRoleFilter,
       resourceSearchQuery,
@@ -302,137 +533,410 @@ export default {
       resourceManagerFilter,
       filteredUsers,
       filteredResources,
+      showConfirmModal,
+      confirmMessage,
+      getManagerName,
+      getResourceIcon,
+      formatRole,
+      formatResourceType,
+      openUserModal,
+      closeUserModal,
+      openResourceModal,
+      closeResourceModal,
+      deleteUser,
+      deleteResource,
+      saveUser,
+      saveResource,
+      confirmAction,
+      cancelAction
     };
   },
 };
 </script>
 
 <style lang="scss" scoped>
-.admin-container {
+.admin-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.admin-header {
+  margin-bottom: 2rem;
+  
+  h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #212529;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    
+    i {
+      color: #0d6efd;
+    }
+  }
+  
+  .alert {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}
+
+.admin-tabs {
+  background: #fff;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.tabs-header {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  padding: 1rem;
+  border-bottom: 1px solid #dee2e6;
+  
+  .tab-btn {
+    flex: 1;
+    padding: 1rem;
+    background: none;
+    border: none;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #6c757d;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    
+    i {
+      font-size: 1.1rem;
+    }
+    
+    &:hover {
+      background-color: #f8f9fa;
+      color: #0d6efd;
+    }
+    
+    &.active {
+      color: #0d6efd;
+      border-bottom: 2px solid #0d6efd;
+      background-color: rgba(13, 110, 253, 0.05);
+    }
+  }
+}
+
+.tabs-content {
+  padding: 1.5rem;
+}
+
+.admin-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    height: 100%;
+    
+    i {
+      font-size: 1rem;
+    }
+  }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6c757d;
+  
+  i {
+    font-size: 3rem;
+    color: #adb5bd;
+    margin-bottom: 1rem;
+  }
+  
+  p {
+    font-size: 1.1rem;
+    margin: 0;
+  }
+}
+
+.admin-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
 }
 
 .admin-card {
-  background: #ffffff;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  max-width: 800px;
-  width: 100%;
-}
-
-.admin-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #343a40;
-  text-align: center;
-  margin-bottom: 1.5rem;
-}
-
-.nav-tabs {
-  border-bottom: 2px solid #dee2e6;
-
-  .nav-link {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 8px 8px 0 0;
-    font-size: 1rem;
-    font-weight: 500;
-    color: #495057;
-    transition: all 0.3s ease;
-    cursor: pointer;
-
-    &:hover {
-      background-color: #f8f9fa;
-    }
-
-    &.active {
-      color: #007bff;
-      border-bottom: 2px solid #007bff;
-      background-color: transparent;
-    }
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
   }
 }
 
-.user-list,
-.resource-list {
-  list-style: none;
-  padding: 0;
-}
-
-.user-item,
-.resource-item {
+.card-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  border: 1px solid #ced4da;
-  border-radius: 8px;
+  gap: 1rem;
   margin-bottom: 1rem;
-  background-color: #f8f9fa;
-}
-
-.user-info,
-.resource-info {
-  flex: 1;
-
-  strong {
-    color: #343a40;
+  
+  .user-avatar,
+  .resource-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: #6c757d;
+    
+    &.photographer {
+      background: rgba(13, 110, 253, 0.1);
+      color: #0d6efd;
+    }
+    
+    &.conference_room {
+      background: rgba(25, 135, 84, 0.1);
+      color: #198754;
+    }
+    
+    &.equipment {
+      background: rgba(108, 117, 125, 0.1);
+      color: #6c757d;
+    }
+  }
+  
+  .user-title,
+  .resource-title {
+    flex: 1;
+    
+    h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0;
+      color: #212529;
+    }
+    
+    .user-role,
+    .resource-type {
+      font-size: 0.8rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      display: inline-block;
+      
+      &.user {
+        background: rgba(108, 117, 125, 0.1);
+        color: #6c757d;
+      }
+      
+      &.manager {
+        background: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+      }
+      
+      &.admin {
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+      }
+    }
+    
+    .resource-type {
+      background: #f8f9fa;
+      color: #6c757d;
+    }
   }
 }
 
-.user-actions,
-.resource-actions {
+.card-body {
+  margin-bottom: 1rem;
+  
+  .info-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+    
+    i {
+      font-size: 0.9rem;
+    }
+  }
+}
+
+.card-actions {
   display: flex;
   gap: 0.5rem;
-}
-
-.btn {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 500;
-  transition: background-color 0.3s ease;
-
-  &:hover {
-    opacity: 0.9;
+  justify-content: flex-end;
+  border-top: 1px solid #f1f1f1;
+  padding-top: 1rem;
+  
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    padding: 0.35rem 0.75rem;
+    
+    i {
+      font-size: 0.9rem;
+    }
   }
 }
 
-.btn-success {
-  background-color: #28a745;
-  color: white;
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
 }
 
-.btn-primary {
-  background-color: #007bff;
-  color: white;
-}
-
-.btn-danger {
-  background-color: #dc3545;
-  color: white;
-}
-
-.btn-secondary {
-  background-color: #6c757d;
-  color: white;
+.modal-dialog {
+  max-width: 500px;
+  width: 100%;
+  margin: 0 1rem;
 }
 
 .modal-content {
-  border-radius: 12px;
+  background: #fff;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
 }
 
 .modal-header {
+  padding: 1.25rem 1.5rem;
   border-bottom: 1px solid #dee2e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  
+  h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    
+    i {
+      color: #0d6efd;
+    }
+  }
+  
+  .btn-close {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    opacity: 0.5;
+    cursor: pointer;
+    
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
+
+.modal-body {
+  padding: 1.5rem;
+  
+  p {
+    margin: 0;
+    font-size: 1rem;
+    color: #212529;
+  }
+  
+  .form-label {
+    font-weight: 500;
+  }
 }
 
 .modal-footer {
+  padding: 1rem 1.5rem;
   border-top: 1px solid #dee2e6;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    
+    i {
+      font-size: 1rem;
+    }
+  }
+}
+
+@media (max-width: 992px) {
+  .admin-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .admin-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-page {
+    padding: 1.5rem 1rem;
+  }
+  
+  .tabs-header .tab-btn {
+    font-size: 0.9rem;
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .admin-filters {
+    grid-template-columns: 1fr;
+  }
+  
+  .admin-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 576px) {
+  .admin-header h1 {
+    font-size: 1.75rem;
+  }
+  
+  .tabs-header {
+    flex-direction: column;
+    
+    .tab-btn {
+      padding: 0.75rem;
+      justify-content: flex-start;
+      border-bottom: 1px solid #dee2e6;
+      
+      &.active {
+        border-bottom: 2px solid #0d6efd;
+      }
+    }
+  }
 }
 </style>

@@ -1,9 +1,12 @@
 <template>
   <div id="app">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <div class="container-fluid">
+    <nav class="navbar navbar-expand-lg navbar-dark">
+      <div class="container">
         <router-link to="/" class="navbar-brand">
-          <span class="app-name">РесурсБук</span>
+          <span class="app-name">
+            <i class="bi bi-bookmark-check me-2"></i>
+            РесурсБук
+          </span>
         </router-link>
 
         <button
@@ -21,53 +24,35 @@
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto">
             <template v-if="isAuthenticated">
-              <li class="nav-item dropdown me-2">
-                <a
-                  class="nav-link position-relative"
-                  href="#"
-                  id="notificationDropdown"
-                  role="button"
-                  data-bs-toggle="dropdown"
-                  aria-expanded="false"
-                >
-                  <i class="bi bi-bell"></i>
-                  <span v-if="unreadNotificationCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                    {{ unreadNotificationCount }}
-                  </span>
-                </a>
-                <ul class="dropdown-menu dropdown-menu-end notification-dropdown" aria-labelledby="notificationDropdown">
-                  <li v-if="notifications.length === 0" class="dropdown-item text-muted">Нет уведомлений</li>
-                  <li v-for="(n, index) in notifications.slice(0, 5)" :key="index" class="dropdown-item notification-item" :class="{ 'unread': !n.isRead }">
-                    <div @click="markAsRead(n.id)">
-                      <p class="notification-text">{{ n.text }}</p>
-                      <small class="notification-time">{{ formatNotificationTime(n.timestamp) }}</small>
-                    </div>
-                  </li>
-                  <li>
-                    <router-link to="/notifications" class="dropdown-item text-center text-primary" @click="markAllAsRead">
-                      Показать все уведомления
-                    </router-link>
-                  </li>
-                </ul>
-              </li>
-
               <li class="nav-item">
-                <router-link to="/profile" class="nav-link">Профиль</router-link>
+                <router-link to="/profile" class="nav-link">
+                  <i class="bi bi-person me-1"></i>Профиль
+                </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/calendar" class="nav-link">Календарь</router-link>
+                <router-link to="/calendar" class="nav-link">
+                  <i class="bi bi-calendar3 me-1"></i>Календарь
+                </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/booking" class="nav-link">Бронирование</router-link>
+                <router-link to="/booking" class="nav-link">
+                  <i class="bi bi-journal-check me-1"></i>Бронирование
+                </router-link>
               </li>
               <li v-if="isManager" class="nav-item">
-                <router-link to="/manager/resources" class="nav-link">Управление ресурсами</router-link>
+                <router-link to="/manager/resources" class="nav-link">
+                  <i class="bi bi-gear me-1"></i>Ресурсы
+                </router-link>
               </li>
               <li v-if="isAdmin" class="nav-item">
-                <router-link to="/admin" class="nav-link">Админка</router-link>
+                <router-link to="/admin" class="nav-link">
+                  <i class="bi bi-shield-lock me-1"></i>Админка
+                </router-link>
               </li>
               <li class="nav-item">
-                <a @click="logout" class="nav-link">Выйти</a>
+                <a @click="logout" class="nav-link">
+                  <i class="bi bi-box-arrow-right me-1"></i>Выйти
+                </a>
               </li>
             </template>
           </ul>
@@ -76,13 +61,25 @@
     </nav>
 
     <main class="main-content">
-      <router-view />
+      <div class="container">
+        <router-view />
+      </div>
     </main>
 
     <button 
       v-if="isAuthenticated"
+      @click="toggleNotificationModal"
+      class="floating-btn notification-btn"
+      :class="{ 'has-unread': unreadNotificationCount > 0 }"
+    >
+      <i class="bi bi-bell"></i>
+      <span v-if="unreadNotificationCount > 0" class="unread-badge">{{ unreadNotificationCount }}</span>
+    </button>
+
+    <button 
+      v-if="isAuthenticated"
       @click="toggleMessenger"
-      class="messenger-btn"
+      class="floating-btn messenger-btn"
       :class="{ 'has-unread': unreadCount > 0 }"
     >
       <i class="bi bi-chat-dots"></i>
@@ -95,9 +92,23 @@
       @close="toggleMessenger"
     />
 
+    <div class="notification-modal-wrapper" :class="{show: isNotificationModalOpen}">
+      <NotificationModal
+        :isOpen="isNotificationModalOpen"
+        :notifications="notifications"
+        :unreadNotificationCount="unreadNotificationCount"
+        @close="isNotificationModalOpen = false"
+        @mark-as-read="markAsRead"
+        @mark-all-read="markAllAsRead"
+        @view-all="handleViewAll"
+      />
+    </div>
+
     <footer class="footer">
       <div class="container">
-        <span class="footer-text">by NikaJoun</span>
+        <span class="footer-text">
+          <i class="bi bi-code-slash me-2"></i>by NikaJoun
+        </span>
       </div>
     </footer>
   </div>
@@ -108,14 +119,16 @@ import { computed, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import Messenger from '@/components/Messenger.vue';
+import NotificationModal from '@/components/NotificationModal.vue';
 import { useToast } from 'vue-toastification';
 
 export default {
-  components: { Messenger },
+  components: { Messenger, NotificationModal },
   setup() {
     const store = useStore();
     const router = useRouter();
     const isMessengerOpen = ref(false);
+    const isNotificationModalOpen = ref(false);
     const toast = useToast();
 
     const isAuthenticated = computed(() => store.state.currentUser !== null);
@@ -150,6 +163,7 @@ export default {
       await store.dispatch('logout');
       router.push('/');
       isMessengerOpen.value = false;
+      isNotificationModalOpen.value = false;
     };
 
     const toggleMessenger = () => {
@@ -159,9 +173,20 @@ export default {
       }
     };
 
+    const toggleNotificationModal = () => {
+      isNotificationModalOpen.value = !isNotificationModalOpen.value;
+    };
+
+    const handleViewAll = () => {
+      markAllAsRead();
+      isNotificationModalOpen.value = false;
+      router.push('/notifications');
+    };
+
     watch(isAuthenticated, (newVal) => {
       if (!newVal) {
         isMessengerOpen.value = false;
+        isNotificationModalOpen.value = false;
       }
     });
 
@@ -179,7 +204,11 @@ export default {
             booking.userId === currentUserId
           ) {
             const msg = 'Ваше бронирование подтверждено!';
-            notifications.value.push(msg);
+            store.dispatch('addNotification', {
+              userId: currentUserId,
+              text: msg,
+              type: 'booking'
+            });
             toast.success(msg);
           }
         });
@@ -201,7 +230,11 @@ export default {
 
         if (newIncoming.length > 0 && !isMessengerOpen.value) {
           const msg = `Новое сообщение от ${newIncoming[0].senderName}`;
-          notifications.value.push(msg);
+          store.dispatch('addNotification', {
+            userId: currentUserId,
+            text: msg,
+            type: 'message'
+          });
           toast.info(msg);
         }
       },
@@ -214,6 +247,7 @@ export default {
       isAdmin,
       unreadCount,
       isMessengerOpen,
+      isNotificationModalOpen,
       notifications,
       unreadNotificationCount,
       formatNotificationTime,
@@ -221,83 +255,130 @@ export default {
       markAllAsRead,
       logout,
       toggleMessenger,
+      toggleNotificationModal,
+      handleViewAll,
     };
   },
 };
 </script>
 
 <style lang="scss">
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+@import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css');
+
+:root {
+  --primary-color: #4e73df;
+  --secondary-color: #f8f9fc;
+  --accent-color: #2e59d9;
+  --dark-color: #2c3e50;
+  --light-color: #ffffff;
+  --success-color: #1cc88a;
+  --warning-color: #f6c23e;
+  --danger-color: #e74a3b;
+  --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --transition: all 0.3s ease;
+}
+
 #app {
   font-family: 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #2c3e50;
+  color: var(--dark-color);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: linear-gradient(135deg, #cacaca, #e5e5e5);
+  background: linear-gradient(to bottom, #f8f9fc, #e5e8f0);
   position: relative;
 }
 
 .navbar {
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+  box-shadow: var(--shadow);
+  padding: 0.8rem 0;
+
+  .container {
+    max-width: 1200px;
+  }
 
   .navbar-brand {
     .app-name {
       font-size: 1.5rem;
       font-weight: 700;
-      color: #ffffff;
+      color: var(--light-color);
+      display: flex;
+      align-items: center;
     }
   }
 
   .nav-link {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.75);
-    transition: color 0.3s ease;
-    cursor: pointer;
+    color: rgba(255, 255, 255, 0.85);
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    margin: 0 0.2rem;
+    border-radius: 0.3rem;
 
     &:hover {
-      color: #ffffff;
+      color: var(--light-color);
+      background-color: rgba(255, 255, 255, 0.1);
     }
 
     &.router-link-exact-active {
-      color: #ffffff;
+      color: var(--light-color);
+      background-color: rgba(255, 255, 255, 0.2);
       font-weight: 600;
     }
-  }
 
-  .bi-bell {
-    font-size: 1.2rem;
+    i {
+      font-size: 1.1rem;
+    }
   }
 }
 
 .main-content {
   flex: 1;
   padding: 2rem 0;
+
+  .container {
+    max-width: 1200px;
+    background-color: var(--light-color);
+    border-radius: 0.5rem;
+    box-shadow: var(--shadow);
+    padding: 2rem;
+    margin-bottom: 2rem;
+  }
 }
 
 .footer {
-  background-color: rgba(59, 60, 61, 0.8);
-  color: #ffffff;
-  padding: 1rem 0;
+  background: linear-gradient(135deg, var(--dark-color), #1a1a2e);
+  color: var(--light-color);
+  padding: 1.2rem 0;
   text-align: center;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  margin-top: auto;
 
   .footer-text {
     font-size: 0.9rem;
     font-weight: 400;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    i {
+      font-size: 1.1rem;
+    }
   }
 }
 
-.messenger-btn {
+.floating-btn {
   position: fixed;
   bottom: 30px;
-  right: 30px;
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background-color: #007bff;
   color: white;
   border: none;
   display: flex;
@@ -305,13 +386,12 @@ export default {
   justify-content: center;
   font-size: 1.5rem;
   cursor: pointer;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow);
   z-index: 1000;
-  transition: all 0.3s ease;
+  transition: var(--transition);
 
   &:hover {
-    background-color: #0069d9;
-    transform: translateY(-3px);
+    transform: translateY(-3px) scale(1.05);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
   }
 
@@ -323,7 +403,7 @@ export default {
     position: absolute;
     top: -5px;
     right: -5px;
-    background-color: #dc3545;
+    background-color: var(--danger-color);
     color: white;
     border-radius: 50%;
     width: 24px;
@@ -336,29 +416,36 @@ export default {
   }
 }
 
-.notification-dropdown {
-  width: 350px;
-  max-height: 400px;
-  overflow-y: auto;
+.notification-btn {
+  left: 30px;
+  background: linear-gradient(135deg, var(--warning-color), #f5b301);
+
+  &:hover {
+    background: linear-gradient(135deg, #f5b301, #e0a800);
+  }
 }
 
-.notification-item {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #eee;
+.messenger-btn {
+  right: 30px;
+  background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+
+  &:hover {
+    background: linear-gradient(135deg, var(--accent-color), #1a4fd9);
+  }
 }
 
-.notification-item.unread {
-  background-color: #f0f7ff;
-}
-
-.notification-text {
-  margin-bottom: 0.25rem;
-  color: #333;
-}
-
-.notification-time {
-  color: #6c757d;
-  font-size: 0.8rem;
+.notification-modal-wrapper {
+  position: fixed;
+  bottom: 0;
+  left: 20px;
+  z-index: 1050;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  will-change: transform;
+  
+  &.show {
+    transform: translateY(0);
+  }
 }
 
 @keyframes pulse {
@@ -368,12 +455,46 @@ export default {
 }
 
 @media (max-width: 768px) {
-  .messenger-btn {
+  .navbar {
+    padding: 0.6rem 0;
+
+    .nav-link {
+      padding: 0.5rem;
+      margin: 0.1rem 0;
+    }
+  }
+
+  .main-content {
+    padding: 1rem 0;
+
+    .container {
+      padding: 1.5rem;
+    }
+  }
+
+  .notification-modal-wrapper {
+    left: 0;
+    right: 0;
+    width: 100%;
+    
+    &.show {
+      transform: translateY(0);
+    }
+  }
+  
+  .floating-btn {
     bottom: 20px;
-    right: 20px;
     width: 50px;
     height: 50px;
     font-size: 1.3rem;
+  }
+  
+  .notification-btn {
+    left: 20px;
+  }
+  
+  .messenger-btn {
+    right: 20px;
   }
 }
 </style>
