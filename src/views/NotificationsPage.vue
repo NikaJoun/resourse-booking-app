@@ -3,7 +3,7 @@
     <div class="container">
       <div class="notifications-header">
         <h1 class="page-title">Уведомления</h1>
-        <button @click="markAllAsRead" class="mark-all-btn">
+        <button @click="markAllAsRead" class="mark-all-btn" v-if="notifications.length > 0">
           <i class="bi bi-check-all"></i> Отметить все как прочитанные
         </button>
       </div>
@@ -15,14 +15,14 @@
         </div>
       </div>
       
-      <ul class="notifications-list">
+      <ul class="notifications-list" v-else>
         <li 
-          v-for="notification in notifications" 
+          v-for="notification in sortedNotifications" 
           :key="notification.id" 
           :class="{ unread: !notification.isRead }"
           @click="markAsRead(notification.id)"
         >
-          <div class="notification-icon">
+          <div class="notification-icon" :class="getNotificationIconClass(notification.type)">
             <i :class="getNotificationIcon(notification.type)"></i>
           </div>
           <div class="notification-content">
@@ -42,51 +42,99 @@
 <script>
 import { computed } from 'vue';
 import { useStore } from 'vuex';
+import { useToast } from 'vue-toastification';
 
 export default {
   setup() {
     const store = useStore();
+    const toast = useToast();
     
-    const notifications = computed(() => store.getters.getNotificationsForCurrentUser);
+    const notifications = computed(() => {
+      return store.getters['notifications/getNotificationsForCurrentUser'] || [];
+    });
+    
+    const sortedNotifications = computed(() => {
+      return [...notifications.value].sort((a, b) => {
+        return new Date(b.timestamp) - new Date(a.timestamp);
+      });
+    });
     
     const formatDate = (dateStr) => {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('ru-RU', {
-        day: 'numeric',
-        month: 'long'
-      });
+      try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('ru-RU', {
+          day: 'numeric',
+          month: 'long'
+        });
+      } catch {
+        return dateStr;
+      }
     };
     
     const formatTime = (dateStr) => {
-      const date = new Date(dateStr);
-      return date.toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      try {
+        const date = new Date(dateStr);
+        return date.toLocaleTimeString('ru-RU', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch {
+        return dateStr;
+      }
     };
     
     const getNotificationIcon = (type) => {
       const icons = {
-        message: 'bi-chat-square-text',
-        booking: 'bi-calendar-check',
-        system: 'bi-info-circle'
+        'new-booking': 'bi-calendar-plus',
+        'booking-confirmed': 'bi-calendar-check',
+        'booking-cancelled': 'bi-calendar-x',
+        'manager-confirmation': 'bi-person-check',
+        'booking-cancelled-manager': 'bi-person-x',
+        'message': 'bi-chat-text',
+        'system': 'bi-info-circle'
       };
       return `bi ${icons[type] || 'bi-bell'}`;
     };
     
+    const getNotificationIconClass = (type) => {
+      const classes = {
+        'new-booking': 'new-booking',
+        'booking-confirmed': 'confirmed',
+        'booking-cancelled': 'cancelled',
+        'manager-confirmation': 'info',
+        'booking-cancelled-manager': 'warning',
+        'message': 'message',
+        'system': 'system'
+      };
+      return classes[type] || 'default';
+    };
+    
     const markAsRead = (notificationId) => {
-      store.dispatch('markNotificationAsRead', notificationId);
+      try {
+        store.commit('notifications/MARK_NOTIFICATION_AS_READ', notificationId);
+      } catch (error) {
+        toast.error('Не удалось отметить уведомление как прочитанное');
+        console.error(error);
+      }
     };
     
     const markAllAsRead = () => {
-      store.dispatch('markAllNotificationsAsRead');
+      try {
+        store.commit('notifications/MARK_ALL_NOTIFICATIONS_AS_READ');
+        toast.success('Все уведомления отмечены как прочитанные');
+      } catch (error) {
+        toast.error('Не удалось отметить все уведомления как прочитанные');
+        console.error(error);
+      }
     };
     
     return {
       notifications,
+      sortedNotifications,
       formatDate,
       formatTime,
       getNotificationIcon,
+      getNotificationIconClass,
       markAsRead,
       markAllAsRead
     };
@@ -206,14 +254,52 @@ export default {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: #e9f5ff;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #1971c2;
   
   i {
     font-size: 1.2rem;
+  }
+  
+  &.new-booking {
+    background-color: #e7f5ff;
+    color: #228be6;
+  }
+  
+  &.confirmed {
+    background-color: #ebfbee;
+    color: #2b8a3e;
+  }
+  
+  &.cancelled {
+    background-color: #fff5f5;
+    color: #e03131;
+  }
+  
+  &.info {
+    background-color: #e7f5ff;
+    color: #1971c2;
+  }
+  
+  &.warning {
+    background-color: #fff9db;
+    color: #e67700;
+  }
+  
+  &.message {
+    background-color: #f3f0ff;
+    color: #5f3dc4;
+  }
+  
+  &.system {
+    background-color: #f8f9fa;
+    color: #495057;
+  }
+  
+  &.default {
+    background-color: #f8f9fa;
+    color: #495057;
   }
 }
 

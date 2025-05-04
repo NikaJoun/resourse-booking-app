@@ -2,8 +2,27 @@
   <div class="profile-page">
     <div class="profile-header">
       <h1><i class="bi bi-person-circle"></i>Личный кабинет</h1>
-      <div v-if="store.state.currentUser" class="user-welcome">
-        <h2>Добро пожаловать, {{ store.state.currentUser.username }}!</h2>
+      <div v-if="store.state.auth.currentUser" class="user-info">
+        <div class="user-avatar">
+          <i class="bi bi-person-fill"></i>
+        </div>
+        <div class="user-details">
+          <h2>Добро пожаловать, {{ store.state.auth.currentUser.username }}!</h2>
+          <div class="user-meta">
+            <div class="meta-item">
+              <i class="bi bi-person-badge"></i>
+              <span>ID: {{ store.state.auth.currentUser.id }}</span>
+            </div>
+            <div class="meta-item">
+              <i class="bi bi-shield"></i>
+              <span>Роль: {{ formatRole(store.state.auth.currentUser.role) }}</span>
+            </div>
+            <div v-if="store.state.auth.currentUser.managedResourceType" class="meta-item">
+              <i class="bi bi-gear"></i>
+              <span>Управляет: {{ store.state.auth.currentUser.managedResourceType }}</span>
+            </div>
+          </div>
+        </div>
         <button @click="showSyncModal = true" class="btn btn-primary sync-btn">
           <i class="bi bi-calendar-plus"></i> Синхронизировать все бронирования
         </button>
@@ -141,26 +160,21 @@ export default {
     const showCancelModal = ref(false);
     const showSyncModal = ref(false);
     const selectedBookingId = ref(null);
+    const formatRole = (role) => {
+      const roles = {
+        admin: 'Администратор',
+        manager: 'Менеджер',
+        user: 'Пользователь'
+      };
+      return roles[role] || role;
+    };
 
-    const activeBookings = computed(() => store.getters.userActiveBookings);
-    const bookingHistory = computed(() => store.getters.userBookingHistory);
+    const activeBookings = computed(() => store.getters['bookings/userActiveBookings']);
+    const bookingHistory = computed(() => store.getters['bookings/userBookingHistory']);
+    const currentUser = computed(() => store.state.auth.currentUser);
 
     const getResourceName = (resourceId) => {
-      return store.getters.getResourceNameById(resourceId);
-    };
-
-    const getStatusClass = (booking) => {
-      if (booking.isCompleted) return 'completed';
-      if (booking.isCancelled) return 'cancelled';
-      if (store.getters.isBookingCompleted(booking)) return 'expired';
-      return booking.isConfirmed ? 'confirmed' : 'pending';
-    };
-
-    const getStatusText = (booking) => {
-      if (booking.isCompleted) return 'Завершено';
-      if (booking.isCancelled) return 'Отменено';
-      if (store.getters.isBookingCompleted(booking)) return 'Истекло';
-      return booking.isConfirmed ? 'Подтверждено' : 'Ожидает подтверждения';
+      return store.getters['resources/getResourceNameById'](resourceId);
     };
 
     const getHourText = (hours) => {
@@ -185,6 +199,20 @@ export default {
       return `${String(endHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     };
 
+    const getStatusClass = (booking) => {
+      if (booking.isCompleted) return 'completed';
+      if (booking.isCancelled) return 'cancelled';
+      if (store.getters['bookings/isBookingCompleted'](booking)) return 'expired';
+      return booking.isConfirmed ? 'confirmed' : 'pending';
+    };
+
+    const getStatusText = (booking) => {
+      if (booking.isCompleted) return 'Завершено';
+      if (booking.isCancelled) return 'Отменено';
+      if (store.getters['bookings/isBookingCompleted'](booking)) return 'Истекло';
+      return booking.isConfirmed ? 'Подтверждено' : 'Ожидает подтверждения';
+    };
+
     const openCancelModal = (bookingId) => {
       selectedBookingId.value = bookingId;
       showCancelModal.value = true;
@@ -197,7 +225,7 @@ export default {
 
     const confirmCancel = () => {
       if (selectedBookingId.value) {
-        store.dispatch('cancelBooking', selectedBookingId.value);
+        store.dispatch('bookings/cancelBooking', selectedBookingId.value);
       }
       closeCancelModal();
     };
@@ -254,24 +282,24 @@ export default {
       const icsContent = generateICS(bookings);
       downloadICSFile(icsContent, 'all-bookings.ics');
       
-      store.dispatch('exportToCalendar');
+      store.dispatch('settings/UPDATE_LAST_EXPORT');
       
-      store.dispatch('addNotification', {
-        userId: store.state.currentUser.id,
+      store.dispatch('notifications/ADD_NOTIFICATION', {
+        userId: currentUser.value.id,
         text: 'Бронирования экспортированы в файл календаря',
         type: 'calendar-export'
-      });
+      }, { root: true });
     };
 
     const exportSingleBooking = (booking) => {
       const icsContent = generateICS([booking]);
       downloadICSFile(icsContent, `booking-${booking.id}.ics`);
       
-      store.dispatch('addNotification', {
-        userId: store.state.currentUser.id,
+      store.dispatch('notifications/ADD_NOTIFICATION', {
+        userId: currentUser.value.id,
         text: `Бронирование ${getResourceName(booking.resourceId)} экспортировано`,
         type: 'calendar-export'
-      });
+      }, { root: true });
     };
 
     return {
@@ -292,7 +320,8 @@ export default {
       closeCancelModal,
       confirmCancel,
       downloadICS,
-      exportSingleBooking
+      exportSingleBooking,
+      formatRole
     };
   },
 };
@@ -481,6 +510,69 @@ export default {
     i {
       font-size: 0.9rem;
     }
+  }
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+}
+
+.user-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #0d6efd;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+}
+
+.user-details {
+  flex: 1;
+  
+  h2 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1.5rem;
+    color: #212529;
+  }
+}
+
+.user-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: #495057;
+  
+  i {
+    color: #6c757d;
+  }
+}
+
+.sync-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-weight: 500;
+  
+  i {
+    font-size: 1.1rem;
   }
 }
 

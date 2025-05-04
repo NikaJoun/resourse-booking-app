@@ -52,12 +52,12 @@ export default {
     const password = ref('');
 
     const login = () => {
-      const user = store.state.users.find(
+      const user = store.state.users.users.find(
         (u) => u.username === username.value && u.password === password.value
       );
 
       if (user) {
-        store.dispatch('login', user);
+        store.dispatch('auth/login', user);
         router.push('/booking');
       } else {
         alert('Неверный логин или пароль');
@@ -78,26 +78,13 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  min-height: 55vh;
   padding: 20px;
 }
 
 .auth-container {
   width: 100%;
   max-width: 400px;
-}
-
-.auth-card {
-  background: white;
-  border-radius: 16px;
-  padding: 40px;
-  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.08);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  
-  &:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  }
 }
 
 .auth-header {

@@ -69,7 +69,7 @@
     <button 
       v-if="isAuthenticated"
       @click="toggleNotificationModal"
-      class="floating-btn notification-btn"
+      class="notification-tab"
       :class="{ 'has-unread': unreadNotificationCount > 0 }"
     >
       <i class="bi bi-bell"></i>
@@ -92,17 +92,12 @@
       @close="toggleMessenger"
     />
 
-    <div class="notification-modal-wrapper" :class="{show: isNotificationModalOpen}">
-      <NotificationModal
-        :isOpen="isNotificationModalOpen"
-        :notifications="notifications"
-        :unreadNotificationCount="unreadNotificationCount"
-        @close="isNotificationModalOpen = false"
-        @mark-as-read="markAsRead"
-        @mark-all-read="markAllAsRead"
-        @view-all="handleViewAll"
-      />
-    </div>
+    <NotificationModal
+      :isOpen="isNotificationModalOpen"
+      :notifications="notifications"
+      :unreadCount="unreadNotificationCount"
+      @close="isNotificationModalOpen = false"
+    />
 
     <footer class="footer">
       <div class="container">
@@ -131,20 +126,17 @@ export default {
     const isNotificationModalOpen = ref(false);
     const toast = useToast();
 
-    const isAuthenticated = computed(() => store.state.currentUser !== null);
-    const isManager = computed(() => store.state.currentUser?.role === 'manager');
-    const isAdmin = computed(() => store.state.currentUser?.role === 'admin');
+    const isAuthenticated = computed(() => store.state.auth.currentUser !== null);
+    const isManager = computed(() => store.state.auth.currentUser?.role === 'manager');
+    const isAdmin = computed(() => store.getters['auth/isAdmin']);
     
     const unreadCount = computed(() => {
       if (!isAuthenticated.value) return 0;
-      const currentUserId = store.state.currentUser.id;
-      return (store.state.messages || []).filter(
-        m => m.receiverId === currentUserId && !m.isRead
-      ).length;
+      return store.getters['messages/getTotalUnreadCount'];
     });
 
-    const notifications = computed(() => store.getters.getNotificationsForCurrentUser);
-    const unreadNotificationCount = computed(() => store.getters.getUnreadNotificationCount);
+    const notifications = computed(() => store.getters['notifications/getNotificationsForCurrentUser']);
+    const unreadNotificationCount = computed(() => store.getters['notifications/getUnreadNotificationCount']);
 
     const formatNotificationTime = (timestamp) => {
       const date = new Date(timestamp);
@@ -152,15 +144,15 @@ export default {
     };
 
     const markAsRead = (notificationId) => {
-      store.dispatch('markNotificationAsRead', notificationId);
+      store.dispatch('notifications/markNotificationAsRead', notificationId);
     };
     
     const markAllAsRead = () => {
-      store.dispatch('markAllNotificationsAsRead');
+      store.dispatch('notifications/markAllNotificationsAsRead');
     };
 
     const logout = async () => {
-      await store.dispatch('logout');
+      await store.dispatch('auth/logout');
       router.push('/');
       isMessengerOpen.value = false;
       isNotificationModalOpen.value = false;
@@ -169,7 +161,10 @@ export default {
     const toggleMessenger = () => {
       isMessengerOpen.value = !isMessengerOpen.value;
       if (isMessengerOpen.value) {
-        store.dispatch('markMessagesAsRead');
+        const currentUserId = store.state.auth.currentUser?.id;
+        if (currentUserId) {
+          store.dispatch('messages/markMessagesAsRead', currentUserId);
+        }
       }
     };
 
@@ -191,20 +186,20 @@ export default {
     });
 
     watch(
-      () => store.state.bookings,
+      () => store.state.bookings.bookings,
       (newBookings, oldBookings) => {
         if (!oldBookings) return;
 
-        const currentUserId = store.state.currentUser?.id;
+        const currentUserId = store.state.auth.currentUser?.id;
         newBookings.forEach(booking => {
           const old = oldBookings.find(b => b.id === booking.id);
           if (
-            booking.status === 'confirmed' &&
-            old?.status !== 'confirmed' &&
+            booking.isConfirmed &&
+            !old?.isConfirmed &&
             booking.userId === currentUserId
           ) {
             const msg = 'Ваше бронирование подтверждено!';
-            store.dispatch('addNotification', {
+            store.dispatch('notifications/ADD_NOTIFICATION', {
               userId: currentUserId,
               text: msg,
               type: 'booking'
@@ -217,11 +212,11 @@ export default {
     );
 
     watch(
-      () => store.state.messages,
+      () => store.state.messages.messages,
       (newMessages, oldMessages) => {
         if (!oldMessages) return;
 
-        const currentUserId = store.state.currentUser?.id;
+        const currentUserId = store.state.auth.currentUser?.id;
         const newIncoming = newMessages.filter(
           m =>
             m.receiverId === currentUserId &&
@@ -229,8 +224,9 @@ export default {
         );
 
         if (newIncoming.length > 0 && !isMessengerOpen.value) {
-          const msg = `Новое сообщение от ${newIncoming[0].senderName}`;
-          store.dispatch('addNotification', {
+          const sender = store.getters['users/getUserById'](newIncoming[0].senderId);
+          const msg = `Новое сообщение от ${sender?.username || 'пользователя'}`;
+          store.dispatch('notifications/ADD_NOTIFICATION', {
             userId: currentUserId,
             text: msg,
             type: 'message'
@@ -340,7 +336,7 @@ export default {
 
 .main-content {
   flex: 1;
-  padding: 2rem 0;
+  padding: 2rem;
 
   .container {
     max-width: 1200px;
@@ -348,17 +344,16 @@ export default {
     border-radius: 0.5rem;
     box-shadow: var(--shadow);
     padding: 2rem;
-    margin-bottom: 2rem;
   }
 }
 
 .footer {
   background: linear-gradient(135deg, var(--dark-color), #1a1a2e);
   color: var(--light-color);
-  padding: 1.2rem 0;
+  padding: 1.2rem;
   text-align: center;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-  margin-top: auto;
+  margin-top: .5rem;
 
   .footer-text {
     font-size: 0.9rem;
@@ -416,12 +411,50 @@ export default {
   }
 }
 
-.notification-btn {
-  left: 30px;
-  background: linear-gradient(135deg, var(--warning-color), #f5b301);
-
+.notification-tab {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) translateX(-50%);
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #f6c23e, #f5b301);
+  color: white;
+  border: none;
+  border-radius: 0 50% 50% 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  cursor: pointer;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  transition: all 0.3s ease;
+  padding-left: 10px;
+  
   &:hover {
-    background: linear-gradient(135deg, #f5b301, #e0a800);
+    transform: translateY(-50%) translateX(-30%);
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3);
+  }
+  
+  &.has-unread {
+    animation: pulse 1.5s infinite;
+  }
+
+  .unread-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: #e74a3b;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
   }
 }
 
@@ -489,10 +522,19 @@ export default {
     font-size: 1.3rem;
   }
   
-  .notification-btn {
-    left: 20px;
+  .notification-tab {
+    width: 50px;
+    height: 50px;
+    font-size: 1.3rem;
+    padding-left: 8px;
+    
+    .unread-badge {
+      width: 20px;
+      height: 20px;
+      font-size: 0.7rem;
+    }
   }
-  
+
   .messenger-btn {
     right: 20px;
   }

@@ -203,7 +203,7 @@
 </template>
 
 <script>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toastification';
 
@@ -213,35 +213,46 @@ export default {
     const toast = useToast();
     const activeTab = ref('resources');
 
+    onMounted(() => {
+      console.log('Store state:', store.state);
+      console.log('Managed resources:', store.getters['resources/managedResources']);
+      console.log('Pending bookings:', store.getters['bookings/pendingBookings']);
+    });
+
     const selectedResourceFilter = ref('');
     const dateFrom = ref('');
     const dateTo = ref('');
     const selectedStatusFilter = ref('');
 
-    const managedResources = computed(() => store.getters.managedResources);
-
-    const pendingBookings = computed(() => {
-      const managedResourceIds = managedResources.value.map((resource) => resource.id);
-      return store.state.bookings.filter(
-        (booking) =>
-          managedResourceIds.includes(booking.resourceId) && !booking.isConfirmed
+    const managedResources = computed(() => {
+      if (!store.getters['auth/isResourceManager']) return [];
+      return store.state.resources.resources.filter(
+        r => r.managerId === store.getters['auth/currentUser'].id
       );
     });
-
+        const pendingBookings = computed(() => {
+      if (!store.getters['auth/isResourceManager']) return [];
+      return store.getters['bookings/pendingBookings'];
+    });
+    
     const allBookings = computed(() => {
-      const managedResourceIds = managedResources.value.map((resource) => resource.id);
-      return store.state.bookings.filter((booking) =>
+      const resources = managedResources.value || [];
+      const managedResourceIds = resources.map((resource) => resource.id);
+      const bookings = store.state.bookings?.bookings || [];
+      return bookings.filter((booking) =>
         managedResourceIds.includes(booking.resourceId)
       );
     });
     
     const getUserName = (userId) => {
-      const user = store.state.users.find(u => u.id === userId);
+      const users = store.state.users?.users || [];
+      const user = users.find(u => u.id === userId);
       return user ? user.username : 'Неизвестный пользователь';
     };
 
     const filteredAllBookings = computed(() => {
-      return allBookings.value.filter(booking => {
+      const bookings = allBookings.value || [];
+      return bookings.filter(booking => {
         if (selectedResourceFilter.value && booking.resourceId !== selectedResourceFilter.value) {
           return false;
         }
@@ -254,13 +265,15 @@ export default {
         }
 
         if (selectedStatusFilter.value) {
+          const isCompleted = store.getters['bookings/isBookingCompleted']?.(booking) || false;
+          
           if (selectedStatusFilter.value === 'pending' && booking.isConfirmed) {
             return false;
           }
-          if (selectedStatusFilter.value === 'confirmed' && (!booking.isConfirmed || booking.isCancelled || booking.isCompleted)) {
+          if (selectedStatusFilter.value === 'confirmed' && (!booking.isConfirmed || booking.isCancelled || isCompleted)) {
             return false;
           }
-          if (selectedStatusFilter.value === 'completed' && !booking.isCompleted) {
+          if (selectedStatusFilter.value === 'completed' && !isCompleted) {
             return false;
           }
           if (selectedStatusFilter.value === 'cancelled' && !booking.isCancelled) {
@@ -273,7 +286,8 @@ export default {
     });
 
     const getResourceName = (resourceId) => {
-      const resource = store.state.resources.find(r => r.id === resourceId);
+      const resources = store.state.resources?.resources || [];
+      const resource = resources.find(r => r.id === resourceId);
       return resource ? resource.name : 'Неизвестный ресурс';
     };
 
@@ -297,7 +311,7 @@ export default {
 
     const confirmBooking = async (bookingId) => {
       try {
-        await store.dispatch('confirmBooking', bookingId);
+        await store.dispatch('bookings/confirmBooking', bookingId);
         toast.success('Бронирование подтверждено');
       } catch (error) {
         toast.error('Ошибка при подтверждении бронирования');
@@ -307,7 +321,7 @@ export default {
 
     const rejectBooking = async (bookingId) => {
       try {
-        await store.dispatch('cancelBooking', bookingId);
+        await store.dispatch('bookings/cancelBooking', bookingId);
         toast.success('Бронирование отклонено');
       } catch (error) {
         toast.error('Ошибка при отклонении бронирования');
@@ -316,32 +330,45 @@ export default {
     };
 
     const getStatusTextClass = (booking) => {
-      if (booking.isCompleted) return 'text-success';
+      if (!booking) return '';
+      const isCompleted = store.getters['bookings/isBookingCompleted']?.(booking) || false;
+      if (isCompleted) return 'text-success';
       if (booking.isCancelled) return 'text-danger';
       return booking.isConfirmed ? 'text-success' : 'text-warning';
     };
 
     const getBookingStatusClass = (booking) => {
-      if (booking.isCompleted) return 'completed';
+      if (!booking) return '';
+      const isCompleted = store.getters['bookings/isBookingCompleted']?.(booking) || false;
+      if (isCompleted) return 'completed';
       if (booking.isCancelled) return 'cancelled';
       return booking.isConfirmed ? 'confirmed' : 'pending';
     };
 
     const getBookingIcon = (booking) => {
-      if (booking.isCompleted) return 'bi bi-check-circle';
+      if (!booking) return 'bi bi-question-circle';
+      const isCompleted = store.getters['bookings/isBookingCompleted']?.(booking) || false;
+      if (isCompleted) return 'bi bi-check-circle';
       if (booking.isCancelled) return 'bi bi-x-circle';
       return booking.isConfirmed ? 'bi bi-check-circle' : 'bi bi-clock';
     };
 
     const getStatusText = (booking) => {
-      if (booking.isCompleted) return 'Завершено';
+      if (!booking) return 'Неизвестный статус';
+      const isCompleted = store.getters['bookings/isBookingCompleted']?.(booking) || false;
+      if (isCompleted) return 'Завершено';
       if (booking.isCancelled) return 'Отменено';
       return booking.isConfirmed ? 'Подтверждено' : 'Ожидает подтверждения';
     };
 
     const formatDate = (dateString) => {
-      const options = { year: 'numeric', month: 'long', day: 'numeric' };
-      return new Date(dateString).toLocaleDateString('ru-RU', options);
+      if (!dateString) return '';
+      try {
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        return new Date(dateString).toLocaleDateString('ru-RU', options);
+      } catch {
+        return dateString;
+      }
     };
 
     return {

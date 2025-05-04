@@ -1,6 +1,5 @@
 <template>
   <div class="booking-page">
-    <!-- Шапка с навигацией -->
     <header class="booking-header">
       <h1>Бронирование ресурсов</h1>
       <div class="booking-steps">
@@ -23,9 +22,7 @@
       </div>
     </header>
 
-    <!-- Основной контент -->
     <main class="booking-content">
-      <!-- Шаг 1: Выбор типа ресурса -->
       <div v-if="step === 1" class="step-content">
         <h2>Выберите тип ресурса</h2>
         <div class="resource-types">
@@ -43,7 +40,6 @@
         </div>
       </div>
 
-      <!-- Шаг 2: Выбор конкретного ресурса -->
       <div v-if="step === 2" class="step-content">
         <h2>Выберите ресурс</h2>
         <div class="resource-list">
@@ -68,18 +64,18 @@
         </div>
       </div>
 
-      <!-- Шаг 3: Выбор даты и времени -->
       <div v-if="step === 3" class="step-content">
         <h2>Выберите дату и время</h2>
         <div class="datetime-selection">
           <div class="calendar-section">
             <CustomCalendar
+              v-if="selectedResource"
               @date-selected="onDateSelected"
               @time-selected="onTimeSelected"
-              :disabledDates="disabledDates"
+              :resourceId="selectedResource.id"
+              :workingHours="selectedResource.workingHours || defaultWorkingHours"
               :minDate="minSelectableDate"
               :maxDate="maxSelectableDate"
-              :disabledTimeSlots="disabledTimeSlots"
             />
           </div>
           <div class="duration-section">
@@ -114,7 +110,6 @@
         </div>
       </div>
 
-      <!-- Шаг 4: Подтверждение брони -->
       <div v-if="step === 4" class="step-content confirmation-step">
         <h2>Подтверждение бронирования</h2>
         <div class="confirmation-details">
@@ -160,7 +155,6 @@
         </div>
       </div>
 
-      <!-- Сообщения об ошибках/успехе -->
       <div v-if="errorMessage" class="alert alert-error">
         <i class="bi bi-exclamation-circle"></i>
         {{ errorMessage }}
@@ -172,7 +166,6 @@
       </div>
     </main>
 
-    <!-- Футер с кнопками навигации -->
     <footer class="booking-footer">
       <button 
         v-if="step > 1" 
@@ -225,7 +218,7 @@ export default {
     const errorMessage = ref('');
     const successMessage = ref('');
 
-    const defaultWorkingHours = { start: '09:00', end: '19:00' };
+    const defaultWorkingHours = { start: '08:00', end: '19:00' };
     const minSelectableDate = new Date().toISOString().split('T')[0];
     const maxSelectableDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -248,7 +241,7 @@ export default {
 
     const filteredResources = computed(() => {
       if (!selectedResourceType.value) return [];
-      return store.state.resources
+      return store.state.resources.resources
         .filter(resource => resource.type === selectedResourceType.value)
         .map(resource => ({
           ...resource,
@@ -258,7 +251,7 @@ export default {
 
     const disabledDates = computed(() => {
       if (!selectedResource.value) return [];
-      return store.state.bookings
+      return store.state.bookings.bookings
         .filter(booking => booking.resourceId === selectedResource.value.id)
         .map(booking => booking.date);
     });
@@ -317,9 +310,10 @@ export default {
     };
 
     const hasTimeConflict = (newBooking) => {
-      const bookingsForResource = store.state.bookings.filter(
+      const bookingsForResource = store.state.bookings.bookings.filter(
         booking => booking.resourceId === newBooking.resourceId && 
-                  booking.date === newBooking.date
+                  booking.date === newBooking.date &&
+                  !booking.isCancelled
       );
       
       if (bookingsForResource.length === 0) return false;
@@ -431,7 +425,8 @@ export default {
     const formatSelectedDate = () => {
       if (!selectedDate.value) return '';
       
-      const date = new Date(selectedDate.value);
+      const [year, month, day] = selectedDate.value.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
       const options = { weekday: 'long', day: 'numeric', month: 'long' };
       return date.toLocaleDateString('ru-RU', options);
     };
@@ -443,7 +438,7 @@ export default {
         date: selectedDate.value,
         time: selectedTime.value,
         duration: selectedDuration.value,
-        userId: store.state.currentUser.id,
+        userId: store.state.auth.currentUser.id,
         isConfirmed: false,
       };
 
@@ -455,7 +450,7 @@ export default {
       }
 
       try {
-        await store.dispatch('addBooking', newBooking);
+        await store.dispatch('bookings/addBooking', newBooking);
         successMessage.value = 'Бронирование успешно создано!';
         toast.success('Бронирование успешно создано!');
         resetForm();
@@ -760,9 +755,13 @@ export default {
 }
 
 .calendar-section {
-  background: #f8f9fa;
-  border-radius: 8px;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
   padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .duration-section {

@@ -1,371 +1,334 @@
 <template>
-  <div class="notification-modal-wrapper" :class="{show: isOpen}">
-    <div class="notification-modal">
-      <div class="modal-header">
-        <div class="header-content">
-          <h5 class="modal-title">Уведомления</h5>
-          <span v-if="unreadNotificationCount > 0" class="unread-count">
-            {{ unreadNotificationCount }} новых
-          </span>
-        </div>
-        <button 
-          type="button" 
-          class="close-btn" 
-          @click="$emit('close')"
-          aria-label="Close"
-        >
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </div>
+  <div>
+    <div 
+      class="modal-overlay" 
+      :class="{ 'active': isOpen }"
+      @click="close"
+    ></div>
+    
+    <div class="notifications-wrapper" :class="{ 'is-open': isOpen }">
+      <div class="modal-container">
+        <header class="modal-header">
+          <h3>
+            <i class="bi bi-bell"></i> Уведомления
+            <span v-if="unreadCount > 0" class="badge">{{ unreadCount }}</span>
+          </h3>
+          <button @click="close" class="icon-btn"><i class="bi bi-x"></i></button>
+        </header>
 
-      <div class="modal-body">
-        <div v-if="notifications.length === 0" class="empty-notifications">
-          <div class="empty-icon">
-            <i class="bi bi-bell"></i>
-          </div>
-          <p>Нет новых уведомлений</p>
-        </div>
-
-        <div 
-          v-for="(n, index) in notifications.slice(0, 5)" 
-          :key="index" 
-          class="notification-item" 
-          :class="{ 'unread': !n.isRead }"
-          @click="markAsRead(n.id)"
-        >
-          <div class="notification-icon" :class="'type-' + n.type">
-            <i class="bi" :class="getNotificationIcon(n.type)"></i>
-          </div>
-          <div class="notification-content">
-            <p class="notification-text">{{ n.text }}</p>
-            <div class="notification-meta">
-              <span class="notification-time">{{ formatNotificationTime(n.timestamp) }}</span>
-              <span v-if="!n.isRead" class="unread-badge">Новое</span>
+        <section class="modal-body">
+          <template v-if="notifications.length === 0">
+            <div class="empty">
+              <i class="bi bi-bell-slash"></i>
+              <p>Нет новых уведомлений</p>
             </div>
-          </div>
-        </div>
-      </div>
+          </template>
 
-      <div class="modal-footer">
-        <button 
-          class="mark-all-btn" 
-          @click="markAllAsRead"
-          :disabled="notifications.length === 0 || unreadNotificationCount === 0"
-        >
-          <i class="bi bi-check-all"></i> Отметить все как прочитанные
-        </button>
-        <router-link 
-          to="/notifications" 
-          class="view-all-link"
-          @click="$emit('view-all')"
-        >
-          Показать все <i class="bi bi-chevron-right"></i>
-        </router-link>
+          <ul v-else class="notification-list">
+            <li
+              v-for="n in notifications"
+              :key="n.id"
+              :class="['notification', { unread: !n.isRead }]"
+              @click="markAsRead(n.id)"
+            >
+              <div :class="['icon', n.type]">
+                <i :class="getIcon(n.type)"></i>
+              </div>
+              <div class="content">
+                <p class="text">{{ n.text }}</p>
+                <div class="meta">
+                  <time>{{ formatTime(n.timestamp) }}</time>
+                  <span v-if="!n.isRead" class="new">Новое</span>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <footer class="modal-footer">
+          <button @click="markAllAsRead" :disabled="unreadCount === 0">
+            <i class="bi bi-check-all"></i> Прочитать все
+          </button>
+          <router-link to="/notifications" @click="close">Смотреть все</router-link>
+        </footer>
       </div>
     </div>
   </div>
 </template>
 
-<script>
-export default {
-  props: {
-    isOpen: {
-      type: Boolean,
-      required: true
-    },
-    notifications: {
-      type: Array,
-      required: true
-    },
-    unreadNotificationCount: {
-      type: Number,
-      default: 0
-    }
-  },
-  methods: {
-    formatNotificationTime(timestamp) {
-      const date = new Date(timestamp);
-      return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    },
-    markAsRead(notificationId) {
-      this.$emit('mark-as-read', notificationId);
-    },
-    markAllAsRead() {
-      this.$emit('mark-all-read');
-    },
-    getNotificationIcon(type) {
-      const icons = {
-        message: 'bi-chat-square-text',
-        booking: 'bi-calendar-check',
-        system: 'bi-info-circle'
-      };
-      return icons[type] || 'bi-bell';
-    }
-  }
-};
-</script>
+<script setup>
+import { format } from 'date-fns'
+import { ru } from 'date-fns/locale'
+import { useStore } from 'vuex'
 
-<style lang="scss" scoped>
-.notification-modal-wrapper {
-  position: fixed;
-  bottom: 0;
-  left: 20px;
-  z-index: 1050;
-  transform: translateY(100%);
-  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  will-change: transform;
-  
-  &.show {
-    transform: translateY(0);
+const store = useStore()
+
+const props = defineProps({
+  isOpen: Boolean,
+  notifications: {
+    type: Array,
+    default: () => []
+  },
+  unreadCount: {
+    type: Number,
+    default: 0
   }
+})
+
+const emit = defineEmits(['close'])
+
+const close = () => emit('close')
+const markAsRead = (id) => store.dispatch('notifications/markNotificationAsRead', id)
+const markAllAsRead = () => store.dispatch('notifications/markAllNotificationsAsRead')
+
+const getIcon = (type) => {
+  const map = {
+    'new-booking': 'bi-calendar-plus',
+    'booking-confirmed': 'bi-calendar-check',
+    'booking-cancelled': 'bi-calendar-x',
+    'manager-confirmation': 'bi-person-check',
+    'booking-cancelled-manager': 'bi-person-x',
+    'message': 'bi-chat-text',
+    'system': 'bi-info-circle'
+  }
+  return `bi ${map[type] || 'bi-bell'}`
 }
 
-.notification-modal {
-  background: white;
-  border-radius: 12px 12px 0 0;
-  box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.1);
+const formatTime = (ts) => {
+  try {
+    return format(new Date(ts), 'HH:mm', { locale: ru })
+  } catch {
+    return ts
+  }
+}
+</script>
+
+<style scoped>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1040;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.notifications-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
   width: 380px;
-  max-height: 70vh;
+  max-width: 90%;
+  z-index: 1050;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+}
+
+.notifications-wrapper.is-open {
+  transform: translateX(0);
+}
+
+.modal-container {
+  position: relative;
+  background: #fff;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #e9ecef;
-  border-bottom: none;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
 }
 
 .modal-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid #f1f3f5;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: white;
-  
-  .header-content {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  
-  .modal-title {
-    margin: 0;
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #212529;
-  }
-  
-  .unread-count {
-    background: #228be6;
-    color: white;
-    font-size: 0.75rem;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-weight: 500;
-  }
-  
-  .close-btn {
-    background: none;
-    border: none;
-    font-size: 1.2rem;
-    color: #868e96;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 50%;
-    transition: all 0.2s;
-    
-    &:hover {
-      background: #f1f3f5;
-      color: #495057;
-    }
-  }
+  background: #fff;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-header .icon-btn {
+  color: #6b7280;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.modal-header .icon-btn:hover {
+  color: #111827;
 }
 
 .modal-body {
   flex: 1;
   overflow-y: auto;
+  padding: 0.5rem 0;
+}
+
+.empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #9ca3af;
+}
+
+.empty i {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.notification-list {
+  list-style: none;
+  margin: 0;
   padding: 0;
 }
 
-.empty-notifications {
-  padding: 40px 20px;
-  text-align: center;
-  
-  .empty-icon {
-    width: 60px;
-    height: 60px;
-    margin: 0 auto 15px;
-    background: #f8f9fa;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    
-    .bi {
-      font-size: 1.8rem;
-      color: #adb5bd;
-    }
-  }
-  
-  p {
-    margin: 0;
-    font-size: 0.95rem;
-    color: #868e96;
-  }
-}
-
-.notification-item {
-  padding: 14px 20px;
+.notification {
   display: flex;
-  align-items: flex-start;
   gap: 12px;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #f3f4f6;
   cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
-  
-  &:not(:last-child) {
-    border-bottom: 1px solid #f1f3f5;
-  }
-  
-  &:hover {
-    background: #f8f9fa;
-  }
-  
-  &.unread {
-    background: #f8fbff;
-    
-    .notification-text {
-      font-weight: 500;
-    }
-  }
+  transition: background-color 0.2s ease;
 }
 
-.notification-icon {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+.notification:hover {
+  background-color: #f9fafb;
+}
+
+.notification.unread {
+  background-color: #f8fafc;
+}
+
+.icon {
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
+  background: #f3f4f6;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
-  
-  &.type-message {
-    background: #e3f2fd;
-    color: #1976d2;
-  }
-  
-  &.type-booking {
-    background: #e8f5e9;
-    color: #388e3c;
-  }
-  
-  &.type-system {
-    background: #fff3e0;
-    color: #ffa000;
-  }
-  
-  .bi {
-    font-size: 1.1rem;
-  }
+  flex-shrink: 0;
+  color: #4b5563;
 }
 
-.notification-content {
+.content {
   flex: 1;
   min-width: 0;
 }
 
-.notification-text {
-  margin: 0 0 6px 0;
-  color: #212529;
+.text {
+  margin: 0 0 6px;
   font-size: 0.95rem;
+  color: #111827;
   line-height: 1.4;
 }
 
-.notification-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.notification.unread .text {
+  font-weight: 500;
 }
 
-.notification-time {
-  color: #868e96;
+.meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   font-size: 0.8rem;
 }
 
-.unread-badge {
-  background: #e9ecef;
-  color: #495057;
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 4px;
+time {
+  color: #9ca3af;
+}
+
+.new {
+  color: #ef4444;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 
 .modal-footer {
-  padding: 12px 20px;
-  border-top: 1px solid #f1f3f5;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #e5e7eb;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: white;
-  
-  .mark-all-btn {
-    background: none;
-    border: none;
-    color: #228be6;
-    font-size: 0.9rem;
-    cursor: pointer;
-    padding: 6px 8px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.2s;
-    
-    &:hover:not(:disabled) {
-      background: #f1f8ff;
-    }
-    
-    &:disabled {
-      color: #adb5bd;
-      cursor: not-allowed;
-    }
-  }
-  
-  .view-all-link {
-    color: #495057;
-    font-size: 0.9rem;
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    transition: color 0.2s;
-    
-    &:hover {
-      color: #228be6;
-    }
-    
-    .bi {
-      font-size: 0.9rem;
-    }
-  }
+  background: #fff;
 }
 
-@media (max-width: 480px) {
-  .notification-modal-wrapper {
-    left: 0;
-    right: 0;
-    width: 100%;
+.modal-footer button {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.25rem 0.5rem;
+}
+
+.modal-footer button:disabled {
+  color: #d1d5db;
+  cursor: not-allowed;
+}
+
+.modal-footer a {
+  color: #3b82f6;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.badge {
+  background: #ef4444;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+@media (max-width: 576px) {
+  .notifications-wrapper {
+    width: 85%;
   }
   
-  .notification-modal {
-    width: 100%;
-    max-width: 100%;
-    border-radius: 12px 12px 0 0;
+  .modal-header {
+    padding: 0.75rem 1rem;
   }
   
-  .notification-item {
-    padding: 12px 16px;
+  .notification {
+    padding: 0.75rem 1rem;
+  }
+  
+  .modal-footer {
+    padding: 0.75rem 1rem;
   }
 }
 </style>

@@ -29,7 +29,7 @@ const routes = [
   {
     path: '/manager/resources',
     component: ManagerResourcesPage,
-    meta: { requiresAuth: true, role: 'manager' },
+    meta: { requiresAuth: true, requiresManager: true },
   },
   {
     path: '/notifications',
@@ -37,6 +37,10 @@ const routes = [
     component: NotificationsPage,
     meta: { requiresAuth: true }
   },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/booking'
+  }
 ];
 
 const router = createRouter({
@@ -45,12 +49,15 @@ const router = createRouter({
 });
 
 router.beforeEach((to, from, next) => {
-  const isAuthenticated = store.state.currentUser !== null;
-  const isAdmin = store.getters.isAdmin;
+  const isAuthenticated = store.state.auth.currentUser !== null;
+  const isAdmin = store.getters['auth/isAdmin'];
+  const isManager = store.getters['auth/isResourceManager'];
 
   if (to.meta.requiresAuth && !isAuthenticated) {
     next('/');
   } else if (to.meta.requiresAdmin && !isAdmin) {
+    next('/booking');
+  } else if (to.meta.requiresManager && !isManager) {
     next('/booking');
   } else {
     next();

@@ -87,7 +87,7 @@
                     <i class="bi bi-pencil"></i> Редактировать
                   </button>
                   <button 
-                    @click="deleteUser(user.id)" 
+                    @click="confirmDeleteUser(user.id)" 
                     class="btn btn-sm btn-outline-danger"
                   >
                     <i class="bi bi-trash"></i> Удалить
@@ -166,7 +166,7 @@
                     <i class="bi bi-pencil"></i> Редактировать
                   </button>
                   <button 
-                    @click="deleteResource(resource.id)" 
+                    @click="confirmDeleteResource(resource.id)" 
                     class="btn btn-sm btn-outline-danger"
                   >
                     <i class="bi bi-trash"></i> Удалить
@@ -179,174 +179,58 @@
       </div>
     </div>
 
-    <!-- Модальное окно пользователя -->
-    <div v-if="showUserModal" class="modal-overlay">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>
-              <i class="bi bi-person"></i> 
-              {{ isEditingUser ? 'Редактировать пользователя' : 'Добавить пользователя' }}
-            </h3>
-            <button @click="closeUserModal" class="btn-close"></button>
-          </div>
-          <div class="modal-body">
-            <form @submit.prevent="saveUser">
-              <div class="mb-3">
-                <label class="form-label">Имя пользователя</label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  v-model="currentUser.username"
-                  required
-                >
-              </div>
-              
-              <div class="mb-3">
-                <label class="form-label">Пароль</label>
-                <input 
-                  type="password" 
-                  class="form-control" 
-                  v-model="currentUser.password"
-                  :required="!isEditingUser"
-                >
-              </div>
-              
-              <div class="mb-3">
-                <label class="form-label">Роль</label>
-                <select class="form-select" v-model="currentUser.role">
-                  <option value="user">Пользователь</option>
-                  <option value="manager">Менеджер</option>
-                  <option value="admin">Администратор</option>
-                </select>
-              </div>
-              
-              <div class="mb-3" v-if="currentUser.role === 'manager'">
-                <label class="form-label">Тип управляемого ресурса</label>
-                <select class="form-select" v-model="currentUser.managedResourceType">
-                  <option value="">Не назначено</option>
-                  <option value="photographer">Фотограф</option>
-                  <option value="conference_room">Конференц-зал</option>
-                  <option value="equipment">Оборудование</option>
-                </select>
-              </div>
-              
-              <div class="modal-footer">
-                <button type="button" @click="closeUserModal" class="btn btn-secondary">
-                  Отмена
-                </button>
-                <button type="submit" class="btn btn-primary">
-                  Сохранить
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Модальное окно ресурса -->
-    <div v-if="showResourceModal" class="modal-overlay">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>
-              <i class="bi bi-collection"></i> 
-              {{ isEditingResource ? 'Редактировать ресурс' : 'Добавить ресурс' }}
-            </h3>
-            <button @click="closeResourceModal" class="btn-close"></button>
-          </div>
-          <div class="modal-body">
-            <form @submit.prevent="saveResource">
-              <div class="mb-3">
-                <label class="form-label">Название</label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  v-model="currentResource.name"
-                  required
-                >
-              </div>
-              
-              <div class="mb-3">
-                <label class="form-label">Тип</label>
-                <select class="form-select" v-model="currentResource.type">
-                  <option value="photographer">Фотограф</option>
-                  <option value="conference_room">Конференц-зал</option>
-                  <option value="equipment">Оборудование</option>
-                </select>
-              </div>
-              
-              <div class="mb-3">
-                <label class="form-label">Ответственный менеджер</label>
-                <select class="form-select" v-model="currentResource.managerId">
-                  <option value="">Не назначено</option>
-                  <option v-for="manager in managers" :key="manager.id" :value="manager.id">
-                    {{ manager.username }}
-                  </option>
-                </select>
-              </div>
-              
-              <div class="modal-footer">
-                <button type="button" @click="closeResourceModal" class="btn btn-secondary">
-                  Отмена
-                </button>
-                <button type="submit" class="btn btn-primary">
-                  Сохранить
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Модальные окна -->
+    <UserModal
+      ref="userModal"
+      :user="currentUser"
+      :isEditing="isEditingUser"
+      @saved="handleUserSaved"
+    />
+    
+    <ResourceModal
+      ref="resourceModal"
+      :resource="currentResource"
+      :isEditing="isEditingResource"
+      @saved="handleResourceSaved"
+    />
 
     <!-- Модальное окно подтверждения -->
-    <div v-if="showConfirmModal" class="modal-overlay">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3><i class="bi bi-exclamation-triangle"></i> Подтверждение</h3>
-          </div>
-          <div class="modal-body">
-            <p>{{ confirmMessage }}</p>
-          </div>
-          <div class="modal-footer">
-            <button @click="cancelAction" class="btn btn-secondary">
-              <i class="bi bi-x-lg"></i> Отмена
-            </button>
-            <button @click="confirmAction" class="btn btn-danger">
-              <i class="bi bi-check-lg"></i> Подтвердить
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <ConfirmModal
+      v-if="showConfirmModal"
+      :message="confirmMessage"
+      @confirm="executeConfirmAction"
+      @cancel="showConfirmModal = false"
+    />
   </div>
 </template>
 
 <script>
 import { computed, ref } from 'vue';
 import { useStore } from 'vuex';
+import UserModal from '@/components/UserModal.vue';
+import ResourceModal from '@/components/ResourceModal.vue';
+import ConfirmModal from '@/components/ConfirmModal.vue';
 
 export default {
+  components: {
+    UserModal,
+    ResourceModal,
+    ConfirmModal
+  },
   setup() {
     const store = useStore();
+    const userModal = ref(null);
+    const resourceModal = ref(null);
 
-    const users = computed(() => store.state.users);
-    const resources = computed(() => store.state.resources);
-    const isAdmin = computed(() => store.getters.isAdmin);
-
+    // Состояние
     const activeTab = ref('users');
     const isEditingUser = ref(false);
     const isEditingResource = ref(false);
-    const showUserModal = ref(false);
-    const showResourceModal = ref(false);
     const showConfirmModal = ref(false);
     const confirmMessage = ref('');
     const actionToConfirm = ref(null);
     const actionParams = ref(null);
-
+    
     const currentUser = ref({
       id: null,
       username: '',
@@ -362,18 +246,25 @@ export default {
       managerId: null,
     });
 
+    // Фильтры
     const userSearchQuery = ref('');
     const userRoleFilter = ref('');
     const resourceSearchQuery = ref('');
     const resourceTypeFilter = ref('');
     const resourceManagerFilter = ref('');
 
-    const managers = computed(() =>
-      store.state.users.filter((user) => user.role === 'manager')
+    // Геттеры
+    const users = computed(() => store.state.users.users);
+    const resources = computed(() => store.state.resources.resources);
+    const isAdmin = computed(() => store.getters['auth/isAdmin']);
+    
+    const managers = computed(() => 
+      store.getters['users/getOtherUsers'].filter(user => user.role === 'manager')
     );
 
+    // Методы
     const getManagerName = (managerId) => {
-      const manager = store.state.users.find((user) => user.id === managerId);
+      const manager = store.state.users.users.find(user => user.id === managerId);
       return manager ? manager.username : null;
     };
 
@@ -404,151 +295,124 @@ export default {
       }
     };
 
+    // Фильтрация
     const filteredUsers = computed(() => {
-      return users.value.filter((user) => {
-        const matchesSearch = user.username.toLowerCase().includes(userSearchQuery.value.toLowerCase());
-        const matchesRole = userRoleFilter.value ? user.role === userRoleFilter.value : true;
+      return users.value.filter(user => {
+        const matchesSearch = user.username.toLowerCase()
+          .includes(userSearchQuery.value.toLowerCase());
+        const matchesRole = userRoleFilter.value 
+          ? user.role === userRoleFilter.value 
+          : true;
         return matchesSearch && matchesRole;
       });
     });
 
     const filteredResources = computed(() => {
-      return resources.value.filter((resource) => {
-        const matchesSearch = resource.name.toLowerCase().includes(resourceSearchQuery.value.toLowerCase());
-        const matchesType = resourceTypeFilter.value ? resource.type === resourceTypeFilter.value : true;
-        const matchesManager = resourceManagerFilter.value ? resource.managerId === resourceManagerFilter.value : true;
+      return resources.value.filter(resource => {
+        const matchesSearch = resource.name.toLowerCase()
+          .includes(resourceSearchQuery.value.toLowerCase());
+        const matchesType = resourceTypeFilter.value 
+          ? resource.type === resourceTypeFilter.value 
+          : true;
+        const matchesManager = resourceManagerFilter.value 
+          ? resource.managerId === resourceManagerFilter.value 
+          : true;
         return matchesSearch && matchesType && matchesManager;
       });
     });
 
+    // Работа с модальными окнами
     const openUserModal = (user) => {
-      if (user) {
-        currentUser.value = { ...user };
-        isEditingUser.value = true;
-      } else {
-        currentUser.value = {
-          id: null,
-          username: '',
-          password: '',
-          role: 'user',
-          managedResourceType: null,
-        };
-        isEditingUser.value = false;
-      }
-      showUserModal.value = true;
-    };
-
-    const closeUserModal = () => {
-      showUserModal.value = false;
+      currentUser.value = user 
+        ? { ...user } 
+        : {
+            id: null,
+            username: '',
+            password: '',
+            role: 'user',
+            managedResourceType: null,
+          };
+      isEditingUser.value = !!user;
+      userModal.value.show();
     };
 
     const openResourceModal = (resource) => {
-      if (resource) {
-        currentResource.value = { ...resource };
-        isEditingResource.value = true;
-      } else {
-        currentResource.value = {
-          id: null,
-          name: '',
-          type: 'photographer',
-          managerId: null,
-        };
-        isEditingResource.value = false;
-      }
-      showResourceModal.value = true;
+      currentResource.value = resource
+        ? { ...resource }
+        : {
+            id: null,
+            name: '',
+            type: 'photographer',
+            managerId: null,
+          };
+      isEditingResource.value = !!resource;
+      resourceModal.value.show();
     };
 
-    const closeResourceModal = () => {
-      showResourceModal.value = false;
+    const handleUserSaved = () => {
+      // Можно добавить обновление списка или другие действия
     };
 
-    const showConfirmation = (message, action, params) => {
-      confirmMessage.value = message;
-      actionToConfirm.value = action;
-      actionParams.value = params;
+    const handleResourceSaved = () => {
+      // Можно добавить обновление списка или другие действия
+    };
+
+    // Подтверждение действий
+    const confirmDeleteUser = (userId) => {
+      const userName = users.value.find(u => u.id === userId)?.username || 'пользователя';
+      confirmMessage.value = `Вы уверены, что хотите удалить ${userName}?`;
+      actionToConfirm.value = (id) => store.dispatch('users/removeUser', id);
+      actionParams.value = userId;
       showConfirmModal.value = true;
     };
 
-    const confirmAction = () => {
-      if (actionToConfirm.value) {
+    const confirmDeleteResource = (resourceId) => {
+      const resourceName = resources.value.find(r => r.id === resourceId)?.name || 'ресурс';
+      confirmMessage.value = `Вы уверены, что хотите удалить ${resourceName}?`;
+      actionToConfirm.value = (id) => store.dispatch('resources/removeResource', id);
+      actionParams.value = resourceId;
+      showConfirmModal.value = true;
+    };
+
+    const executeConfirmAction = () => {
+      if (actionToConfirm.value && actionParams.value) {
         actionToConfirm.value(actionParams.value);
       }
       showConfirmModal.value = false;
     };
 
-    const cancelAction = () => {
-      showConfirmModal.value = false;
-    };
-
-    const deleteUser = (userId) => {
-      showConfirmation(
-        'Вы уверены, что хотите удалить этого пользователя?',
-        (id) => store.commit('REMOVE_USER', id),
-        userId
-      );
-    };
-
-    const deleteResource = (resourceId) => {
-      showConfirmation(
-        'Вы уверены, что хотите удалить этот ресурс?',
-        (id) => store.commit('REMOVE_RESOURCE', id),
-        resourceId
-      );
-    };
-
-    const saveUser = () => {
-      if (isEditingUser.value) {
-        store.commit('UPDATE_USER', currentUser.value);
-      } else {
-        store.commit('ADD_USER', currentUser.value);
-      }
-      closeUserModal();
-    };
-
-    const saveResource = () => {
-      if (isEditingResource.value) {
-        store.commit('UPDATE_RESOURCE', currentResource.value);
-      } else {
-        store.commit('ADD_RESOURCE', currentResource.value);
-      }
-      closeResourceModal();
-    };
-
     return {
-      users,
-      resources,
-      isAdmin,
       activeTab,
       isEditingUser,
       isEditingResource,
-      showUserModal,
-      showResourceModal,
+      showConfirmModal,
+      confirmMessage,
       currentUser,
       currentResource,
-      managers,
       userSearchQuery,
       userRoleFilter,
       resourceSearchQuery,
       resourceTypeFilter,
       resourceManagerFilter,
+      users,
+      resources,
+      isAdmin,
+      managers,
       filteredUsers,
       filteredResources,
-      showConfirmModal,
-      confirmMessage,
+      userModal,
+      resourceModal,
       getManagerName,
       getResourceIcon,
       formatRole,
       formatResourceType,
       openUserModal,
-      closeUserModal,
       openResourceModal,
-      closeResourceModal,
-      deleteUser,
-      deleteResource,
-      saveUser,
-      saveResource,
-      confirmAction,
-      cancelAction
+      handleUserSaved,
+      handleResourceSaved,
+      confirmDeleteUser,
+      confirmDeleteResource,
+      executeConfirmAction
     };
   },
 };

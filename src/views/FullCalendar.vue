@@ -96,12 +96,15 @@ export default {
     const searchQuery = ref('');
     const selectedResource = ref('');
     const currentWeekStart = ref(getMonday(new Date()));
-    const resources = computed(() => store.state.resources);
-    const bookings = computed(() =>
-      store.state.bookings.filter(
+
+    // Получаем данные из хранилища с учетом модулей
+    const resources = computed(() => store.state.resources.resources);
+    const bookings = computed(() => 
+      store.state.bookings.bookings.filter(
         (booking) => !booking.isCancelled
       )
     );
+
     const isBookingExpired = (booking) => {
       const bookingDate = new Date(`${booking.date}T${booking.time}`);
       return bookingDate < new Date();
@@ -126,15 +129,15 @@ export default {
       return `${formatDisplayDate(start)} - ${formatDisplayDate(end)}`;
     });
 
-    const timeSlots = Array.from({ length: 12 }, (_, i) => {
-      const hour = i + 7;
+    const timeSlots = Array.from({ length: 11 }, (_, i) => {
+      const hour = i + 8;
       return `${String(hour).padStart(2, '0')}:00`;
     });
 
     const filteredBookings = computed(() => {
       const weekDates = days.value.map(day => day.date);
       return bookings.value.filter((booking) => {
-        const resource = store.getters.getResourceNameById(booking.resourceId);
+        const resource = store.getters['resources/getResourceNameById'](booking.resourceId);
         const matchesSearch = resource.toLowerCase().includes(searchQuery.value.toLowerCase());
         const matchesResource = selectedResource.value ? booking.resourceId === selectedResource.value : true;
         const matchesDate = weekDates.includes(booking.date);
@@ -153,8 +156,8 @@ export default {
         return cellHour >= bookingHour && cellHour < bookingEndHour;
       }).map((booking) => ({
         ...booking,
-        resourceName: store.getters.getResourceNameById(booking.resourceId),
-        userName: store.getters.getUserNameById(booking.userId) || `Пользователь ${booking.userId}`,
+        resourceName: store.getters['resources/getResourceNameById'](booking.resourceId),
+        userName: store.getters['users/getUserNameById'](booking.userId) || `Пользователь ${booking.userId}`,
         isExpired: isBookingExpired(booking)
       }));
     };
