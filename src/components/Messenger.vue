@@ -176,13 +176,11 @@ export default {
       { id: 'group', label: 'Общий', icon: 'bi bi-people' }
     ]
 
-    // Получаем данные из хранилища
     const currentUser = computed(() => store.state.auth.currentUser)
     const users = computed(() => store.state.users.users)
     const messages = computed(() => store.state.messages.messages)
     const groupMessages = computed(() => store.state.messages.groupMessages)
 
-    // Фильтруем пользователей по поисковому запросу
     const filteredUsers = computed(() => {
       return users.value
         .filter(user => user.id !== currentUser.value?.id)
@@ -191,7 +189,6 @@ export default {
         )
     })
 
-    // Получаем количество непрочитанных сообщений для каждого пользователя
     const unreadCounts = computed(() => {
       const counts = {}
       if (!currentUser.value) return counts
@@ -205,24 +202,20 @@ export default {
       return counts
     })
 
-    // Общее количество непрочитанных сообщений
     const totalUnreadCount = computed(() => {
       return Object.values(unreadCounts.value).reduce((sum, count) => sum + count, 0)
     })
 
-    // Сообщения для выбранного пользователя
     const currentMessages = computed(() => {
       if (!selectedUser.value || !currentUser.value) return []
       return store.getters['messages/getMessagesForUser'](selectedUser.value.id)
     })
 
-    // Получаем имя пользователя по ID
     const getUserName = (userId) => {
       const user = users.value.find(u => u.id === userId)
       return user ? user.username : 'Неизвестный'
     }
 
-    // Получаем превью последнего сообщения
     const getLastMessagePreview = (userId) => {
       const messages = store.getters['messages/getMessagesForUser'](userId)
       if (messages.length === 0) return 'Нет сообщений'
@@ -233,7 +226,6 @@ export default {
         : lastMessage.text
     }
 
-    // Форматируем время сообщения
     const formatMessageTime = (timestamp) => {
       try {
         return format(new Date(timestamp), 'HH:mm', { locale: ru })
@@ -242,18 +234,14 @@ export default {
       }
     }
 
-    // Выбираем пользователя для чата
     const selectUser = (user) => {
       selectedUser.value = user
-      // Помечаем сообщения как прочитанные
       store.dispatch('messages/markMessagesAsRead', user.id)
-      // Прокручиваем вниз после обновления DOM
       nextTick(() => {
         scrollToBottom(messagesContainer.value)
       })
     }
 
-    // Отправляем личное сообщение
     const sendMessage = async () => {
       if (!newMessage.value.trim() || !selectedUser.value) return
 
@@ -272,7 +260,6 @@ export default {
       }
     }
 
-    // Отправляем сообщение в общий чат
     const sendGroupMessage = async () => {
       if (!newGroupMessage.value.trim()) return
 
@@ -290,19 +277,16 @@ export default {
       }
     }
 
-    // Прокручиваем контейнер сообщений вниз
     const scrollToBottom = (container) => {
       if (container) {
         container.scrollTop = container.scrollHeight
       }
     }
 
-    // Закрываем модальное окно
     const close = () => {
       emit('close')
     }
 
-    // Автоматическая прокрутка при получении новых сообщений
     watch(currentMessages, () => {
       nextTick(() => {
         scrollToBottom(messagesContainer.value)
