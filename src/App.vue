@@ -79,7 +79,7 @@
     <button 
       v-if="isAuthenticated"
       @click="toggleMessenger"
-      class="floating-btn messenger-btn"
+      class="messenger-tab"
       :class="{ 'has-unread': unreadCount > 0 }"
     >
       <i class="bi bi-chat-dots"></i>
@@ -458,12 +458,51 @@ export default {
   }
 }
 
-.messenger-btn {
-  right: 30px;
+.messenger-tab {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%) translateX(50%);
+  width: 60px;
+  height: 60px;
   background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
-
+  color: white;
+  border: none;
+  border-radius: 50% 0 0 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  cursor: pointer;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  transition: all 0.3s ease;
+  padding-right: 10px;
+  
   &:hover {
+    transform: translateY(-50%) translateX(30%);
+    box-shadow: -4px 0 15px rgba(0, 0, 0, 0.3);
     background: linear-gradient(135deg, var(--accent-color), #1a4fd9);
+  }
+  
+  &.has-unread {
+    animation: pulse 1.5s infinite;
+  }
+
+  .unread-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: #e74a3b;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
   }
 }
 
@@ -533,10 +572,6 @@ export default {
       height: 20px;
       font-size: 0.7rem;
     }
-  }
-
-  .messenger-btn {
-    right: 20px;
   }
 }
 </style>
